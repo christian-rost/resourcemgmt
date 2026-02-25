@@ -10,8 +10,8 @@ from slowapi.errors import RateLimitExceeded
 
 from .config import CORS_ORIGINS, PORT, admin_user, admin_pw
 from .database import get_db        # Supabase-Singleton
-from .auth import create_access_token, authenticate_user, get_current_user
-from .user_storage import create_user, get_user_by_username
+from .auth import create_access_token, authenticate_user, get_current_user, verify_password, hash_password
+from .user_storage import create_user, get_user_by_username, update_user
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,6 +69,11 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class UserResponse(BaseModel):
     id: str
     username: str
@@ -95,6 +100,19 @@ async def login(request: Request, body: UserLogin):
 @app.get("/api/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
+
+
+@app.put("/api/auth/password")
+async def change_password(
+    body: PasswordChange,
+    current_user: dict = Depends(get_current_user),
+):
+    if not verify_password(body.current_password, current_user.get("password_hash", "")):
+        raise HTTPException(status_code=400, detail="Aktuelles Passwort ist falsch")
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Neues Passwort muss mindestens 8 Zeichen haben")
+    update_user(current_user["id"], {"password_hash": hash_password(body.new_password)})
+    return {"detail": "Passwort geändert"}
 
 
 # ── Health endpoints ─────────────────────────────────────────────────────────

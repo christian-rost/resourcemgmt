@@ -81,8 +81,11 @@ async def get_users(current_user: dict = Depends(require_role("admin", "manager"
 @router.post("/users", status_code=201)
 async def create_new_user(
     body: UserCreate,
-    current_user: dict = Depends(require_role("admin")),
+    current_user: dict = Depends(require_role("admin", "manager")),
 ):
+    # Manager dürfen keine Admins anlegen
+    if current_user.get("role") == "manager" and body.role == "admin":
+        raise HTTPException(status_code=403, detail="Manager cannot create admin users")
     user = create_user(
         username=body.username,
         email=body.email,

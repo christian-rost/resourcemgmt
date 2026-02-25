@@ -6,7 +6,7 @@ const ROLES = ['admin', 'manager', 'consultant']
 const ROLE_LABELS = { admin: 'Administrator', manager: 'Manager', consultant: 'Berater' }
 
 export default function AdminView() {
-  const { fetchWithAuth, isAdmin } = useAuth()
+  const { fetchWithAuth, isAdmin, isManager, user } = useAuth()
   const { addToast } = useToast()
   const [tab, setTab] = useState('users')
   const [users, setUsers] = useState([])
@@ -114,9 +114,9 @@ export default function AdminView() {
         <div className="card">
           <div className="card-header">
             Benutzerverwaltung
-            {isAdmin && <button className="btn btn-sm btn-primary" onClick={openNew}>+ Neu</button>}
+            {isManager && <button className="btn btn-sm btn-primary" onClick={openNew}>+ Neu</button>}
           </div>
-          {showUserForm && isAdmin && (
+          {showUserForm && isManager && (
             <div className="card-body" style={{ borderBottom: '1px solid var(--color-gray)' }}>
               <form onSubmit={saveUser}>
                 <div className="form-row">
@@ -139,7 +139,7 @@ export default function AdminView() {
                   <div className="form-group">
                     <label>Rolle *</label>
                     <select value={uRole} onChange={e => setURole(e.target.value)}>
-                      {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                      {ROLES.filter(r => isAdmin || r !== 'admin').map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                     </select>
                   </div>
                 </div>
