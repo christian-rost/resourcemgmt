@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from ..auth import get_current_user, require_role
-from ..main import get_supabase
+from ..database import get_db as get_supabase
 from ..services.pdf_service import generate_timesheet_pdf
 
 logger = logging.getLogger(__name__)

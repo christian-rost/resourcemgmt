@@ -9,7 +9,7 @@ from ..auth import get_current_user, require_role, hash_password
 from ..user_storage import (
     list_users, get_user_by_id, create_user, update_user, delete_user, ROLES
 )
-from ..main import get_supabase
+from ..database import get_db as get_supabase
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin"])

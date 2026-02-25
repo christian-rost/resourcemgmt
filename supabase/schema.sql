@@ -1,6 +1,22 @@
 -- Ressourcenmanagement – Supabase Schema
 -- Execute this in the Supabase SQL Editor
 
+-- ── Benutzer ─────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS users (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    username      text NOT NULL UNIQUE,
+    email         text NOT NULL UNIQUE,
+    display_name  text NOT NULL DEFAULT '',
+    role          text NOT NULL DEFAULT 'consultant'
+                      CHECK (role IN ('admin', 'manager', 'consultant')),
+    password_hash text NOT NULL,
+    is_active     boolean DEFAULT true,
+    created_at    timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
+CREATE INDEX IF NOT EXISTS idx_users_email    ON users (email);
+
 -- ── Kunden ───────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS customers (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -25,7 +41,7 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS project_assignments (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id  uuid REFERENCES projects(id) ON DELETE CASCADE,
-    user_id     text NOT NULL,
+    user_id     uuid REFERENCES users(id) ON DELETE CASCADE,
     created_at  timestamptz DEFAULT now(),
     UNIQUE (project_id, user_id)
 );
@@ -33,7 +49,7 @@ CREATE TABLE IF NOT EXISTS project_assignments (
 -- ── Zeiterfassungen ───────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS time_entries (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id          text NOT NULL,
+    user_id          uuid REFERENCES users(id) ON DELETE CASCADE,
     project_id       uuid REFERENCES projects(id) ON DELETE SET NULL,
     entry_date       date NOT NULL,
     hours            decimal NOT NULL CHECK (hours > 0),
@@ -42,7 +58,7 @@ CREATE TABLE IF NOT EXISTS time_entries (
     is_billable      boolean DEFAULT true,
     status           text DEFAULT 'draft'
                         CHECK (status IN ('draft', 'submitted', 'approved', 'rejected')),
-    approved_by      text,
+    approved_by      uuid REFERENCES users(id) ON DELETE SET NULL,
     approved_at      timestamptz,
     rejection_reason text,
     created_at       timestamptz DEFAULT now(),
@@ -59,7 +75,7 @@ CREATE INDEX IF NOT EXISTS idx_time_entries_status
 -- ── Zeitplanungen ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS planning_entries (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     text NOT NULL,
+    user_id     uuid REFERENCES users(id) ON DELETE CASCADE,
     project_id  uuid REFERENCES projects(id) ON DELETE CASCADE,
     plan_year   integer NOT NULL,
     plan_month  integer NOT NULL CHECK (plan_month BETWEEN 1 AND 12),

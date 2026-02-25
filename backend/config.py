@@ -34,8 +34,5 @@ _cors_env = os.getenv("CORS_ORIGINS", "http://localhost:5174,http://localhost:30
 CORS_ORIGINS = [origin.strip().strip('"').strip("'") for origin in _cors_env.split(",") if origin.strip()]
 logger.info(f"CORS_ORIGINS configured: {CORS_ORIGINS}")
 
-# Data directories
-USER_DATA_DIR = "data/users"
-
 # Server Configuration
 PORT = 8003

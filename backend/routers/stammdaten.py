@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..auth import get_current_user, require_role
-from ..main import get_supabase
+from ..database import get_db as get_supabase
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/stammdaten", tags=["Stammdaten"])

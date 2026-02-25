@@ -1,16 +1,15 @@
 """Main FastAPI application for Ressourcenmanagement."""
 import logging
-from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from supabase import create_client, Client
 
-from .config import CORS_ORIGINS, PORT, supabase_url, supabase_key, admin_user, admin_pw
+from .config import CORS_ORIGINS, PORT, admin_user, admin_pw
+from .database import get_db        # Supabase-Singleton
 from .auth import create_access_token, authenticate_user, get_current_user
 from .user_storage import create_user, get_user_by_username
 
@@ -34,20 +33,8 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-# ── Supabase client ──────────────────────────────────────────────────────────
-
-_supabase: Optional[Client] = None
-if supabase_url and supabase_key:
-    _supabase = create_client(supabase_url, supabase_key)
-    logger.info("Supabase client initialized")
-else:
-    logger.warning("Supabase credentials not set - database features disabled")
-
-
-def get_supabase() -> Client:
-    if not _supabase:
-        raise HTTPException(status_code=503, detail="Database not configured")
-    return _supabase
+# Alias damit bestehende Router-Imports (from ..main import get_supabase) weiterhin funktionieren
+get_supabase = get_db
 
 
 # ── Startup: bootstrap admin ─────────────────────────────────────────────────
@@ -55,16 +42,19 @@ def get_supabase() -> Client:
 @app.on_event("startup")
 async def bootstrap_admin():
     if not admin_user or not admin_pw:
-        logger.warning("admin_user/admin_pw not set - skipping admin bootstrap")
+        logger.warning("admin_user/admin_pw not set – skipping admin bootstrap")
         return
-    if get_user_by_username(admin_user):
-        logger.info(f"Admin user '{admin_user}' already exists")
-        return
-    result = create_user(admin_user, f"{admin_user}@local", admin_pw, role="admin")
-    if result:
-        logger.info(f"Admin user '{admin_user}' created")
-    else:
-        logger.error("Failed to create admin user")
+    try:
+        if get_user_by_username(admin_user):
+            logger.info(f"Admin user '{admin_user}' already exists")
+            return
+        result = create_user(admin_user, f"{admin_user}@local", admin_pw, role="admin")
+        if result:
+            logger.info(f"Admin user '{admin_user}' created")
+        else:
+            logger.error("Failed to create admin user")
+    except Exception as e:
+        logger.error(f"Admin bootstrap failed: {e}")
 
 
 # ── Pydantic models (auth) ───────────────────────────────────────────────────
@@ -116,7 +106,8 @@ async def root():
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "database": _supabase is not None}
+    from .database import get_client
+    return {"status": "healthy", "database": get_client() is not None}
 
 
 # ── Register routers ─────────────────────────────────────────────────────────
