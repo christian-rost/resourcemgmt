@@ -15,4 +15,5 @@ dependencies = [
     "slowapi>=0.1.9",
     "supabase>=2.0.0",
     "reportlab>=4.2.0",
+    "svglib>=1.5.0",
 ]

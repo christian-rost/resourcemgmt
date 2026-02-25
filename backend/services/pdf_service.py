@@ -1,20 +1,62 @@
 """PDF generation service using reportlab."""
 import calendar
 import io
+import logging
 from datetime import date
 from typing import Optional
 
+import requests
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import (
-    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, Image
 )
+
+logger = logging.getLogger(__name__)
 
 # Default corporate design colors
 DEFAULT_PRIMARY = "#ee7f00"
 DEFAULT_DARK = "#213452"
+
+
+def _fetch_logo(logo_url: str, max_height: float = 1.5 * cm):
+    """Fetch logo from URL and return a reportlab flowable, or None on failure."""
+    if not logo_url:
+        return None
+    try:
+        resp = requests.get(logo_url, timeout=5)
+        resp.raise_for_status()
+        content_type = resp.headers.get("content-type", "")
+        data = resp.content
+
+        if "svg" in content_type or logo_url.lower().endswith(".svg"):
+            from svglib.svglib import svg2rlg
+            from reportlab.graphics import renderPDF
+            import tempfile, os
+            with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as f:
+                f.write(data)
+                tmp_path = f.name
+            try:
+                drawing = svg2rlg(tmp_path)
+                if drawing:
+                    scale = max_height / drawing.height
+                    drawing.width *= scale
+                    drawing.height *= scale
+                    drawing.transform = (scale, 0, 0, scale, 0, 0)
+                    return drawing
+            finally:
+                os.unlink(tmp_path)
+        else:
+            img = Image(io.BytesIO(data))
+            scale = max_height / img.imageHeight
+            img.drawWidth = img.imageWidth * scale
+            img.drawHeight = max_height
+            return img
+    except Exception as e:
+        logger.warning(f"Logo konnte nicht geladen werden ({logo_url}): {e}")
+        return None
 
 
 def _hex_to_color(hex_str: str):
@@ -83,6 +125,10 @@ def generate_timesheet_pdf(
     elements = []
 
     # Header
+    logo = _fetch_logo(config.get("logo_url", ""))
+    if logo:
+        elements.append(logo)
+        elements.append(Spacer(1, 0.3 * cm))
     elements.append(Paragraph(company_name, title_style))
     elements.append(Paragraph(f"Leistungsnachweis — {month_name} {year}", subtitle_style))
     elements.append(HRFlowable(width="100%", thickness=2, color=primary_color, spaceAfter=8))
