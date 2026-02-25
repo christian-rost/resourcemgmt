@@ -51,20 +51,41 @@ export default function ReportsView() {
   async function exportPdf() {
     if (!selectedProject) { addToast('Bitte Projekt wählen', 'warning'); return }
     setExporting(true)
+    const proj = projects.find(p => p.id === selectedProject)
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`
     try {
-      let url = `/api/reports/pdf?year=${year}&month=${month}&project_id=${selectedProject}&billable_only=${billableOnly}`
-      if (selectedUser) url += `&user_id=${selectedUser}`
-      const resp = await fetchWithAuth(url)
-      if (!resp.ok) { addToast('Fehler beim PDF-Export', 'error'); return }
-      const blob = await resp.blob()
-      const dlUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = dlUrl
-      const proj = projects.find(p => p.id === selectedProject)
-      a.download = `Zeiterfassung_${proj?.name || 'Projekt'}_${year}-${String(month).padStart(2,'0')}.pdf`
-      a.click()
-      URL.revokeObjectURL(dlUrl)
-      addToast('PDF exportiert', 'success')
+      if (isManager && !selectedUser) {
+        // Export all users as ZIP
+        const url = `/api/reports/pdf-all?year=${year}&month=${month}&project_id=${selectedProject}&billable_only=${billableOnly}`
+        const resp = await fetchWithAuth(url)
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}))
+          addToast(err.detail || 'Fehler beim ZIP-Export', 'error')
+          return
+        }
+        const blob = await resp.blob()
+        const dlUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = dlUrl
+        a.download = `Zeiterfassung_${proj?.name || 'Projekt'}_${monthStr}_alle.zip`
+        a.click()
+        URL.revokeObjectURL(dlUrl)
+        addToast('ZIP mit allen Berater-PDFs exportiert', 'success')
+      } else {
+        // Export single user PDF
+        let url = `/api/reports/pdf?year=${year}&month=${month}&project_id=${selectedProject}&billable_only=${billableOnly}`
+        if (selectedUser) url += `&user_id=${selectedUser}`
+        const resp = await fetchWithAuth(url)
+        if (!resp.ok) { addToast('Fehler beim PDF-Export', 'error'); return }
+        const blob = await resp.blob()
+        const dlUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = dlUrl
+        a.download = `Zeiterfassung_${proj?.name || 'Projekt'}_${monthStr}.pdf`
+        a.click()
+        URL.revokeObjectURL(dlUrl)
+        addToast('PDF exportiert', 'success')
+      }
     } finally {
       setExporting(false)
     }
