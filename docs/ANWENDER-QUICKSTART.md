@@ -9,75 +9,68 @@
 ## 1. Login
 
 1. https://rm.xqtfive.de aufrufen
-2. Benutzername und Passwort eingeben
+2. **Benutzername** und **Passwort** eingeben
 3. **Anmelden** klicken
 
 ---
 
 ## 2. Erste Zeitbuchung
 
-1. Tab **Zeiterfassung** öffnen
-2. Gewünschtes Datum wählen
-3. **+ Neue Buchung** klicken
-4. Formular ausfüllen:
+1. Tab **Zeiterfassung** öffnen (Ansicht **Tag** ist Standard)
+2. **`+ Eintrag`** klicken
+3. Formular ausfüllen:
    - **Projekt** auswählen
    - **Stunden** eingeben (z. B. `8`)
-   - **Pausenzeit** eingeben (z. B. `0.5` für 30 Minuten)
-   - **Kommentar** optional (z. B. „Kickoff-Meeting")
+   - **Pause (h)** eingeben (z. B. `0.5`)
+   - **Kommentar** optional
    - **Abrechenbar** aktivieren wenn zutreffend
-5. **Speichern**
+4. **Eintrag hinzufügen**
 
-Die Buchung erscheint jetzt mit Status **Entwurf**.
+Die Buchung erscheint mit Status **Entwurf**.
 
 ---
 
 ## 3. Buchung einreichen
 
-Wenn die Buchung fertig ist:
-1. Buchung in der Liste auswählen
-2. **Einreichen** klicken
-3. Status wechselt auf **Eingereicht**
+- Einzelner Eintrag: **Einreichen**-Button am Eintrag klicken
+- Alle Einträge des Tages auf einmal: **Alle einreichen**
 
-Der zuständige Manager oder Admin genehmigt die Buchung.
+Status wechselt auf **Eingereicht** — der zuständige Manager oder Admin gibt frei.
 
 ---
 
 ## 4. Status verfolgen
 
-In der Monatsansicht sehen Sie den Status aller Buchungen:
-
-| Farbe/Status | Bedeutung |
-|---|---|
-| Entwurf | Noch nicht eingereicht |
-| Eingereicht | Wartet auf Genehmigung |
-| Genehmigt | Abgeschlossen |
+| Status | Bedeutung |
+|--------|-----------|
+| Entwurf | Noch nicht eingereicht, editierbar |
+| Eingereicht | Wartet auf Freigabe |
+| Freigegeben | Abgeschlossen |
 | Abgelehnt | Mit Ablehnungsgrund |
 
 ---
 
 ## 5. Buchungen kopieren (Tipp)
 
-Wiederkehrende Projekte müssen nicht täglich neu eingegeben werden:
-1. Bestehende Buchung(en) auswählen
-2. **Kopieren** → Zieldatum eingeben
-3. Fertig — neue Entwürfe sind angelegt
+Wiederkehrende Projekte in der **Monatsansicht** schnell kopieren:
+1. Einträge markieren → **Kopieren**
+2. Zieldatum eingeben
+3. Neue Entwürfe sind sofort angelegt
 
 ---
 
-## Für Manager: Genehmigung
+## Für Manager: Freigabe
 
-1. Tab **Zeiterfassung** → **Genehmigungen**
-2. Eingereichte Buchungen werden angezeigt
-3. **Genehmigen** oder **Ablehnen** (mit Grund)
+1. **Zeiterfassung** → Tagesansicht des betreffenden Beraters öffnen
+2. Bei eingereichten Einträgen: **`✓ OK`** klicken → Eintrag ist freigegeben
 
 ---
 
 ## Für Manager: Ressourcenplanung
 
-1. Tab **Zeitplanung**
-2. **+ Neuer Eintrag**
-3. Berater, Projekt, Monat und geplante Stunden eingeben
-4. Soll-Ist-Vergleich unter **Soll-Ist** einsehen
+1. Tab **Zeitplanung** → **`+ Planung`**
+2. Berater, Projekt, Monat und Stunden eingeben → **Anlegen**
+3. Soll-Ist-Vergleich im **Dashboard** einsehen
 
 ---
 
@@ -85,6 +78,7 @@ Wiederkehrende Projekte müssen nicht täglich neu eingegeben werden:
 
 | Problem | Lösung |
 |---------|--------|
-| Kein Projekt in der Auswahl | Administrator um Projektzuordnung bitten |
+| Kein Projekt in der Auswahl | Administrator um Projektzuordnung bitten (Stammdaten → Berater-Zuordnung) |
 | Buchung kann nicht bearbeitet werden | Nur Entwürfe sind editierbar |
-| Passwort vergessen | Administrator kontaktieren |
+| Passwort vergessen | Administrator kontaktieren (Admin → Benutzer → Bearbeiten) |
+| PDF enthält keine Einträge | Einträge müssen Status **Freigegeben** haben |
