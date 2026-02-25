@@ -41,7 +41,9 @@ def generate_timesheet_pdf(
     customer = project.get("customers") or {}
     customer_name = customer.get("name", "")
     project_name = project.get("name", "")
-    month_name = calendar.month_name[month]
+    GERMAN_MONTHS = ["", "Januar", "Februar", "März", "April", "Mai", "Juni",
+                     "Juli", "August", "September", "Oktober", "November", "Dezember"]
+    month_name = GERMAN_MONTHS[month]
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
