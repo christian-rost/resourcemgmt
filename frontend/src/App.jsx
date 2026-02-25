@@ -92,7 +92,7 @@ function AppContent() {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <header className="header">
         <div className="header-left">
-          <h1>Ressourcenmanagement</h1>
+          <h1>XQT5 Ressource</h1>
           <nav className="nav-tabs">
             {navItems.map(n => (
               <button

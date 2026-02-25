@@ -1,4 +1,4 @@
-"""Main FastAPI application for Ressourcenmanagement."""
+"""Main FastAPI application for XQT5 Ressource."""
 import logging
 
 from fastapi import FastAPI, Depends, HTTPException, Request
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(title="Ressourcenmanagement API", version="1.0.0")
+app = FastAPI(title="XQT5 Ressource API", version="1.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -119,7 +119,7 @@ async def change_password(
 
 @app.get("/")
 async def root():
-    return {"status": "healthy", "service": "Ressourcenmanagement API"}
+    return {"status": "healthy", "service": "XQT5 Ressource API"}
 
 
 @app.get("/api/health")

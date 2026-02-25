@@ -25,7 +25,7 @@ export default function Login() {
     <div className="login-container">
       <div className="login-box">
         <div className="login-logo">
-          <h1>Ressourcenmanagement</h1>
+          <h1>XQT5 Ressource</h1>
           <p>Zeiterfassung &amp; Zeitplanung</p>
         </div>
         <form onSubmit={handleSubmit}>

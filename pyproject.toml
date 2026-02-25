@@ -1,7 +1,7 @@
 [project]
 name = "ressourcenmanagement"
 version = "1.0.0"
-description = "Ressourcenmanagement - Zeiterfassung & Zeitplanung"
+description = "XQT5 Ressource - Zeiterfassung & Zeitplanung"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.0",
