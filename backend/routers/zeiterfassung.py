@@ -207,6 +207,8 @@ async def update_status(
     elif body.status in ("approved", "rejected"):
         if role not in ("admin", "manager"):
             raise HTTPException(status_code=403, detail="Only managers/admins can approve")
+        if role == "manager" and entry["user_id"] == current_user["id"]:
+            raise HTTPException(status_code=403, detail="Manager kann eigene Einträge nicht selbst genehmigen")
         if current_status != "submitted":
             raise HTTPException(status_code=400, detail="Only submitted entries can be approved/rejected")
     elif body.status == "draft":

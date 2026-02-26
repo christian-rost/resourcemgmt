@@ -3,7 +3,7 @@ import EntryForm from './EntryForm.jsx'
 
 const STATUS_LABELS = { draft: 'Entwurf', submitted: 'Eingereicht', approved: 'Freigegeben', rejected: 'Abgelehnt' }
 
-export default function TagView({ entries, projects, year, month, day, onCreateEntry, onUpdateEntry, onDeleteEntry, onSubmitEntries, onApproveEntry, loading, isManager }) {
+export default function TagView({ entries, projects, year, month, day, onCreateEntry, onUpdateEntry, onDeleteEntry, onSubmitEntries, loading }) {
   const [showForm, setShowForm] = useState(false)
   const [editEntry, setEditEntry] = useState(null)
 
@@ -84,12 +84,6 @@ export default function TagView({ entries, projects, year, month, day, onCreateE
                         {e.status === 'draft' && <button className="btn btn-xs btn-secondary" onClick={() => { setEditEntry(e); setShowForm(true) }}>✎</button>}
                         {e.status === 'draft' && <button className="btn btn-xs btn-outline" onClick={() => onSubmitEntries([e.id])}>Einreichen</button>}
                         {e.status === 'draft' && <button className="btn btn-xs btn-danger" onClick={() => onDeleteEntry(e.id)}>✕</button>}
-                        {isManager && e.status === 'submitted' && (
-                          <>
-                            <button className="btn btn-xs btn-success" onClick={() => onApproveEntry(e.id, true)}>✓ OK</button>
-                            <button className="btn btn-xs btn-danger" onClick={() => onApproveEntry(e.id, false)}>✕</button>
-                          </>
-                        )}
                       </div>
                     </td>
                   </tr>

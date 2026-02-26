@@ -15,8 +15,8 @@ function getWeekday(year, month, day) {
 export default function MonatView({
   entries, projects, year, month,
   onCreateEntry, onUpdateEntry, onDeleteEntry,
-  onSubmitEntries, onApproveEntry, onCopyEntries,
-  loading, isManager,
+  onSubmitEntries, onCopyEntries,
+  loading,
 }) {
   const [showForm, setShowForm] = useState(false)
   const [editEntry, setEditEntry] = useState(null)
@@ -218,12 +218,6 @@ export default function MonatView({
                               className="btn btn-xs btn-danger"
                               onClick={() => onDeleteEntry(e.id)}
                             >✕</button>
-                          )}
-                          {isManager && e.status === 'submitted' && (
-                            <>
-                              <button className="btn btn-xs btn-success" onClick={() => onApproveEntry(e.id, true)}>✓</button>
-                              <button className="btn btn-xs btn-danger" onClick={() => onApproveEntry(e.id, false)}>✕</button>
-                            </>
                           )}
                         </div>
                       </td>

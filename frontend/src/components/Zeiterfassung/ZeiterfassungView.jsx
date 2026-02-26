@@ -16,8 +16,10 @@ const MONTHS = [
   'Juli','August','September','Oktober','November','Dezember'
 ]
 
+const STATUS_LABELS = { draft: 'Entwurf', submitted: 'Eingereicht', approved: 'Freigegeben', rejected: 'Abgelehnt' }
+
 export default function ZeiterfassungView() {
-  const { fetchWithAuth, isManager } = useAuth()
+  const { fetchWithAuth, isManager, user } = useAuth()
   const { addToast } = useToast()
   const now = new Date()
   const [mode, setMode] = useState('monat')
@@ -28,8 +30,16 @@ export default function ZeiterfassungView() {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(false)
 
+  // Approval queue (managers only)
+  const [approvalEntries, setApprovalEntries] = useState([])
+  const [approvalUsers, setApprovalUsers] = useState({}) // id → display_name
+  const [approvalLoading, setApprovalLoading] = useState(false)
+  const [rejectId, setRejectId] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
+
   useEffect(() => { loadProjects() }, [])
   useEffect(() => { loadEntries() }, [mode, year, month, day])
+  useEffect(() => { if (isManager) loadApprovalQueue() }, [isManager])
 
   async function loadProjects() {
     const resp = await fetchWithAuth('/api/stammdaten/projects/assigned')
@@ -37,14 +47,35 @@ export default function ZeiterfassungView() {
   }
 
   async function loadEntries() {
+    if (!user) return
     setLoading(true)
     try {
-      let url = `/api/zeiterfassung/entries?year=${year}&month=${month}`
+      // Always load only own entries (user_id=own)
+      let url = `/api/zeiterfassung/entries?year=${year}&month=${month}&user_id=${user.id}`
       if (mode === 'tag') url += `&day=${day}`
       const resp = await fetchWithAuth(url)
       if (resp.ok) setEntries(await resp.json())
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadApprovalQueue() {
+    setApprovalLoading(true)
+    try {
+      const [qResp, uResp] = await Promise.all([
+        fetchWithAuth('/api/zeiterfassung/approval-queue'),
+        fetchWithAuth('/api/admin/users'),
+      ])
+      if (qResp.ok) setApprovalEntries(await qResp.json())
+      if (uResp.ok) {
+        const users = await uResp.json()
+        const map = {}
+        for (const u of users) map[u.id] = u.display_name || u.username
+        setApprovalUsers(map)
+      }
+    } finally {
+      setApprovalLoading(false)
     }
   }
 
@@ -98,14 +129,21 @@ export default function ZeiterfassungView() {
     await loadEntries()
   }
 
-  async function approveEntry(id, approved) {
+  async function approveQueueEntry(id, approved, reason) {
+    const body = { status: approved ? 'approved' : 'rejected' }
+    if (!approved && reason) body.rejection_reason = reason
     const resp = await fetchWithAuth(`/api/zeiterfassung/entries/${id}/status`, {
       method: 'POST',
-      body: JSON.stringify({ status: approved ? 'approved' : 'rejected' }),
+      body: JSON.stringify(body),
     })
     if (resp.ok) {
       addToast(approved ? 'Freigegeben' : 'Zurückgewiesen', 'success')
-      await loadEntries()
+      setRejectId(null)
+      setRejectReason('')
+      await loadApprovalQueue()
+    } else {
+      const err = await resp.json()
+      addToast(err.detail || 'Fehler', 'error')
     }
   }
 
@@ -149,10 +187,8 @@ export default function ZeiterfassungView() {
     onUpdateEntry: updateEntry,
     onDeleteEntry: deleteEntry,
     onSubmitEntries: submitEntries,
-    onApproveEntry: approveEntry,
     onCopyEntries: copyEntries,
     loading,
-    isManager,
   }
 
   return (
@@ -181,6 +217,85 @@ export default function ZeiterfassungView() {
       {mode === 'tag' && <TagView {...sharedProps} />}
       {mode === 'woche' && <WocheView {...sharedProps} />}
       {mode === 'monat' && <MonatView {...sharedProps} />}
+
+      {/* Approval queue for managers/admins */}
+      {isManager && (
+        <div className="card" style={{ marginTop: '1rem' }}>
+          <div className="card-header">
+            Ausstehende Genehmigungen
+            {approvalEntries.length > 0 && (
+              <span style={{ marginLeft: '0.5rem', background: 'var(--color-primary)', color: '#fff', borderRadius: '10px', padding: '0.1rem 0.5rem', fontSize: '0.78rem' }}>
+                {approvalEntries.length}
+              </span>
+            )}
+          </div>
+          {approvalLoading ? (
+            <div className="loading"><div className="loading-spinner" /> Laden...</div>
+          ) : approvalEntries.length === 0 ? (
+            <div className="empty-state"><p>Keine Einträge zur Genehmigung.</p></div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Berater</th>
+                    <th>Datum</th>
+                    <th>Projekt</th>
+                    <th style={{ textAlign: 'right' }}>Stunden</th>
+                    <th>Abr.</th>
+                    <th>Kommentar</th>
+                    <th style={{ width: '140px' }}>Aktion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {approvalEntries.map(e => (
+                    <>
+                      <tr key={e.id}>
+                        <td style={{ fontWeight: 500 }}>{approvalUsers[e.user_id] || e.user_id.slice(0, 8)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{e.entry_date}</td>
+                        <td>
+                          {e.projects?.customers?.name && <span style={{ color: 'var(--color-text-light)', marginRight: '0.3rem' }}>{e.projects.customers.name} /</span>}
+                          {e.projects?.name || '—'}
+                        </td>
+                        <td className="num">{e.hours} h</td>
+                        <td style={{ textAlign: 'center' }}>{e.is_billable ? '✓' : '—'}</td>
+                        <td style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {e.comment || '—'}
+                        </td>
+                        <td>
+                          {rejectId === e.id ? null : (
+                            <div style={{ display: 'flex', gap: '0.3rem' }}>
+                              <button className="btn btn-xs btn-success" onClick={() => approveQueueEntry(e.id, true)}>✓ OK</button>
+                              <button className="btn btn-xs btn-danger" onClick={() => { setRejectId(e.id); setRejectReason('') }}>✕ Ablehnen</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                      {rejectId === e.id && (
+                        <tr key={`reject-${e.id}`} style={{ background: '#fff8f8' }}>
+                          <td colSpan={7} style={{ padding: '0.5rem 0.75rem' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                              <input
+                                type="text"
+                                placeholder="Ablehnungsgrund (optional)"
+                                value={rejectReason}
+                                onChange={e => setRejectReason(e.target.value)}
+                                style={{ flex: 1, padding: '0.3rem 0.5rem', border: '1px solid var(--color-gray)', borderRadius: '4px', fontSize: '0.85rem' }}
+                              />
+                              <button className="btn btn-xs btn-danger" onClick={() => approveQueueEntry(e.id, false, rejectReason)}>Ablehnen</button>
+                              <button className="btn btn-xs btn-secondary" onClick={() => setRejectId(null)}>Abbrechen</button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
