@@ -303,11 +303,11 @@ export default function StammdatenView() {
                   <div className="card-body" style={{ borderBottom: '1px solid var(--color-gray)' }}>
                     <form onSubmit={saveAssignment} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
                       <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                        <label>Berater</label>
+                        <label>Benutzer</label>
                         <select value={assignUser} onChange={e => setAssignUser(e.target.value)} required>
-                          <option value="">— Berater wählen —</option>
-                          {users.filter(u => u.role === 'consultant').map(u => (
-                            <option key={u.id} value={u.id}>{u.display_name || u.username}</option>
+                          <option value="">— Benutzer wählen —</option>
+                          {users.filter(u => u.role === 'consultant' || u.role === 'manager').map(u => (
+                            <option key={u.id} value={u.id}>{u.display_name || u.username} ({u.role})</option>
                           ))}
                         </select>
                       </div>
