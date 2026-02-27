@@ -94,6 +94,10 @@ mmh3==5.2.0
     # via pyiceberg
 multidict==6.7.1
     # via yarl
+et-xmlfile==2.0.0
+    # via openpyxl
+openpyxl==3.1.5
+    # via ressourcenmanagement (pyproject.toml)
 packaging==26.0
     # via
     #   deprecation

@@ -16,6 +16,7 @@ export default function ReportsView() {
   const [selectedUser, setSelectedUser] = useState('')
   const [billableOnly, setBillableOnly] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [exportingXlsx, setExportingXlsx] = useState(false)
 
   // Global planning dashboard
   const [planningData, setPlanningData] = useState([])
@@ -91,6 +92,48 @@ export default function ReportsView() {
     }
   }
 
+  async function exportExcel() {
+    if (!selectedProject) { addToast('Bitte Projekt wählen', 'warning'); return }
+    setExportingXlsx(true)
+    const proj = projects.find(p => p.id === selectedProject)
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`
+    try {
+      if (isManager && !selectedUser) {
+        // Export all users as ZIP
+        const url = `/api/reports/excel-all?year=${year}&month=${month}&project_id=${selectedProject}&billable_only=${billableOnly}`
+        const resp = await fetchWithAuth(url)
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}))
+          addToast(err.detail || 'Fehler beim ZIP-Export', 'error')
+          return
+        }
+        const blob = await resp.blob()
+        const dlUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = dlUrl
+        a.download = `Leistungsnachweis_${proj?.name || 'Projekt'}_${monthStr}_alle.zip`
+        a.click()
+        URL.revokeObjectURL(dlUrl)
+        addToast('ZIP mit allen Berater-Excels exportiert', 'success')
+      } else {
+        let url = `/api/reports/excel?year=${year}&month=${month}&project_id=${selectedProject}&billable_only=${billableOnly}`
+        if (selectedUser) url += `&user_id=${selectedUser}`
+        const resp = await fetchWithAuth(url)
+        if (!resp.ok) { addToast('Fehler beim Excel-Export', 'error'); return }
+        const blob = await resp.blob()
+        const dlUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = dlUrl
+        a.download = `Leistungsnachweis_${proj?.name || 'Projekt'}_${monthStr}.xlsx`
+        a.click()
+        URL.revokeObjectURL(dlUrl)
+        addToast('Excel-Leistungsnachweis exportiert', 'success')
+      }
+    } finally {
+      setExportingXlsx(false)
+    }
+  }
+
   function prevMonth() {
     if (month === 1) { setMonth(12); setYear(y => y - 1) } else setMonth(m => m - 1)
   }
@@ -118,9 +161,9 @@ export default function ReportsView() {
         </div>
       </div>
 
-      {/* PDF Export */}
+      {/* Export */}
       <div className="card">
-        <div className="card-header">PDF-Leistungsnachweis exportieren (REQ-16/17)</div>
+        <div className="card-header">Leistungsnachweis exportieren</div>
         <div className="card-body">
           <div className="form-row">
             <div className="form-group">
@@ -152,8 +195,11 @@ export default function ReportsView() {
             <div className="form-hint">Ohne Häkchen: alle freigegebenen Einträge (internes Report)</div>
           </div>
           <div className="form-actions">
-            <button className="btn btn-primary" onClick={exportPdf} disabled={exporting || !selectedProject}>
-              {exporting ? 'Exportiere PDF...' : '⬇ PDF exportieren'}
+            <button className="btn btn-primary" onClick={exportPdf} disabled={exporting || exportingXlsx || !selectedProject}>
+              {exporting ? 'Exportiere...' : '⬇ PDF exportieren'}
+            </button>
+            <button className="btn btn-secondary" onClick={exportExcel} disabled={exporting || exportingXlsx || !selectedProject}>
+              {exportingXlsx ? 'Exportiere...' : '⬇ Excel exportieren'}
             </button>
           </div>
           <div style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
