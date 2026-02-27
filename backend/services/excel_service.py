@@ -31,6 +31,7 @@ def generate_timesheet_excel(
 ) -> bytes:
     """Generate an Excel timesheet based on the XQT5 Leistungsnachweis template."""
     wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    wb.template = False  # Speichern als .xlsx, nicht als .xltx-Template
     ws = wb["XQT5-LN"]
 
     customer = project.get("customers") or {}
