@@ -50,11 +50,32 @@ export default function ZeiterfassungView() {
     if (!user) return
     setLoading(true)
     try {
-      // Always load only own entries (user_id=own)
-      let url = `/api/zeiterfassung/entries?year=${year}&month=${month}&user_id=${user.id}`
-      if (mode === 'tag') url += `&day=${day}`
-      const resp = await fetchWithAuth(url)
-      if (resp.ok) setEntries(await resp.json())
+      if (mode === 'woche') {
+        // Compute monday/sunday of the current week
+        const d = new Date(year, month - 1, day)
+        const wd = (d.getDay() + 6) % 7
+        const monday = new Date(d)
+        monday.setDate(d.getDate() - wd)
+        const sunday = new Date(monday)
+        sunday.setDate(monday.getDate() + 6)
+
+        const monYear = monday.getFullYear(), monMonth = monday.getMonth() + 1
+        const sunYear = sunday.getFullYear(), sunMonth = sunday.getMonth() + 1
+
+        const fetches = [fetchWithAuth(`/api/zeiterfassung/entries?year=${monYear}&month=${monMonth}&user_id=${user.id}`)]
+        if (monYear !== sunYear || monMonth !== sunMonth) {
+          fetches.push(fetchWithAuth(`/api/zeiterfassung/entries?year=${sunYear}&month=${sunMonth}&user_id=${user.id}`))
+        }
+        const resps = await Promise.all(fetches)
+        const all = []
+        for (const resp of resps) { if (resp.ok) all.push(...await resp.json()) }
+        setEntries(all)
+      } else {
+        let url = `/api/zeiterfassung/entries?year=${year}&month=${month}&user_id=${user.id}`
+        if (mode === 'tag') url += `&day=${day}`
+        const resp = await fetchWithAuth(url)
+        if (resp.ok) setEntries(await resp.json())
+      }
     } finally {
       setLoading(false)
     }
@@ -164,6 +185,9 @@ export default function ZeiterfassungView() {
     if (mode === 'tag') {
       const d = new Date(year, month - 1, day - 1)
       setYear(d.getFullYear()); setMonth(d.getMonth() + 1); setDay(d.getDate())
+    } else if (mode === 'woche') {
+      const d = new Date(year, month - 1, day - 7)
+      setYear(d.getFullYear()); setMonth(d.getMonth() + 1); setDay(d.getDate())
     } else {
       if (month === 1) { setMonth(12); setYear(y => y - 1) } else setMonth(m => m - 1)
     }
@@ -172,14 +196,34 @@ export default function ZeiterfassungView() {
     if (mode === 'tag') {
       const d = new Date(year, month - 1, day + 1)
       setYear(d.getFullYear()); setMonth(d.getMonth() + 1); setDay(d.getDate())
+    } else if (mode === 'woche') {
+      const d = new Date(year, month - 1, day + 7)
+      setYear(d.getFullYear()); setMonth(d.getMonth() + 1); setDay(d.getDate())
     } else {
       if (month === 12) { setMonth(1); setYear(y => y + 1) } else setMonth(m => m + 1)
     }
   }
 
-  const periodLabel = mode === 'tag'
-    ? `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year}`
-    : `${MONTHS[month - 1]} ${year}`
+  const periodLabel = (() => {
+    if (mode === 'tag') {
+      return `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year}`
+    }
+    if (mode === 'woche') {
+      const d = new Date(year, month - 1, day)
+      const wd = (d.getDay() + 6) % 7
+      const monday = new Date(d)
+      monday.setDate(d.getDate() - wd)
+      const sunday = new Date(monday)
+      sunday.setDate(monday.getDate() + 6)
+      const fmt = dt => `${String(dt.getDate()).padStart(2,'0')}.${String(dt.getMonth()+1).padStart(2,'0')}.`
+      // ISO week number
+      const du = new Date(Date.UTC(monday.getFullYear(), monday.getMonth(), monday.getDate()))
+      du.setUTCDate(du.getUTCDate() + 4 - (du.getUTCDay() || 7))
+      const kw = Math.ceil((((du - new Date(Date.UTC(du.getUTCFullYear(), 0, 1))) / 86400000) + 1) / 7)
+      return `KW ${kw} — ${fmt(monday)} bis ${fmt(sunday)}${sunday.getFullYear()}`
+    }
+    return `${MONTHS[month - 1]} ${year}`
+  })()
 
   const sharedProps = {
     entries, projects, year, month, day,
