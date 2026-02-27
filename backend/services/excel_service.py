@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 
 import openpyxl
+from openpyxl.styles import Alignment
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,9 @@ def generate_timesheet_excel(
         if d_str in entry_by_date:
             ed = entry_by_date[d_str]
             comment = "; ".join(ed["comments"])
-            ws.cell(row=row, column=4).value = comment  # D: Tätigkeit
+            taetigkeit = ws.cell(row=row, column=4)
+            taetigkeit.value = comment  # D: Tätigkeit
+            taetigkeit.alignment = Alignment(wrap_text=True, vertical="top")
             if ed["break_hours"]:
                 pause_cell = ws.cell(row=row, column=7)
                 pause_cell.value = ed["break_hours"]  # G: Pause (dezimal Stunden)
