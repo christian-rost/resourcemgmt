@@ -74,7 +74,9 @@ def generate_timesheet_excel(
 
         if d_str in entry_by_date:
             ed = entry_by_date[d_str]
-            comment = "; ".join(ed["comments"])
+            # Newlines und mehrfache Leerzeichen aus Kommentaren entfernen
+            cleaned = [" ".join(c.split()) for c in ed["comments"] if c.strip()]
+            comment = "; ".join(cleaned)
             taetigkeit = ws.cell(row=row, column=4)
             taetigkeit.value = comment  # D: Tätigkeit
             taetigkeit.alignment = Alignment(wrap_text=True, vertical="top")
