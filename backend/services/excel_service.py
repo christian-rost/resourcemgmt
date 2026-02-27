@@ -82,8 +82,8 @@ def generate_timesheet_excel(
             taetigkeit.alignment = Alignment(wrap_text=True, vertical="top")
             if ed["break_hours"]:
                 pause_cell = ws.cell(row=row, column=7)
-                pause_cell.value = ed["break_hours"]  # G: Pause (dezimal Stunden)
-                pause_cell.number_format = "0.##"
+                pause_cell.value = ed["break_hours"] / 24  # Excel-Zeit: Bruchteil eines Tages
+                pause_cell.number_format = "HH:MM"
             ws.cell(row=row, column=8).value = ed["hours"]  # H: Gesamt [h]
 
     # --- Update SUM formula to match actual month length ---
