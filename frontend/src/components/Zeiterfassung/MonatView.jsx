@@ -79,24 +79,22 @@ export default function MonatView({
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {selected.size > 0 && (
-            <>
-              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                <input
-                  type="date"
-                  value={copyTarget}
-                  onChange={e => setCopyTarget(e.target.value)}
-                  style={{ padding: '0.3rem 0.5rem', border: '1px solid var(--color-gray)', borderRadius: '4px', fontSize: '0.8rem' }}
-                />
-                <button className="btn btn-sm btn-secondary" onClick={handleCopy} disabled={!copyTarget}>
-                  Kopieren
-                </button>
-              </div>
-              <button className="btn btn-sm btn-outline" onClick={handleSubmitSelected}>
-                {selected.size} Einreichen
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <input
+                type="date"
+                value={copyTarget}
+                onChange={e => setCopyTarget(e.target.value)}
+                style={{ padding: '0.3rem 0.5rem', border: '1px solid var(--color-gray)', borderRadius: '4px', fontSize: '0.8rem' }}
+              />
+              <button className="btn btn-sm btn-secondary" onClick={handleCopy} disabled={!copyTarget}>
+                Kopieren
               </button>
-            </>
+            </div>
           )}
           <button className="btn btn-sm btn-secondary" onClick={selectAll}>Alle Draft wählen</button>
+          <button className="btn btn-sm btn-outline" onClick={handleSubmitSelected} disabled={selected.size === 0}>
+            {selected.size > 0 ? `${selected.size} Einreichen` : 'Einreichen'}
+          </button>
           <button className="btn btn-sm btn-primary" onClick={() => { setEditEntry(null); setShowForm(true) }}>
             + Eintrag
           </button>

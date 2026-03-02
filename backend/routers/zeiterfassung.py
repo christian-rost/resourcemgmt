@@ -307,8 +307,12 @@ async def approval_queue(
     current_user: dict = Depends(require_role("admin", "manager")),
     supabase=Depends(get_supabase),
 ):
-    """All submitted entries awaiting approval."""
-    resp = supabase.table("time_entries").select(
+    """All submitted entries awaiting approval.
+    Managers only see entries from other users (not their own)."""
+    query = supabase.table("time_entries").select(
         "*, projects(name, customers(name))"
-    ).eq("status", "submitted").order("entry_date").execute()
+    ).eq("status", "submitted").order("entry_date")
+    if current_user.get("role") == "manager":
+        query = query.neq("user_id", current_user["id"])
+    resp = query.execute()
     return resp.data or []
