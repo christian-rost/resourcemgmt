@@ -134,6 +134,7 @@ export default function MonatView({
                 <tr>
                   <th style={{ width: '32px' }}></th>
                   <th>Datum</th>
+                  <th>Zeitraum</th>
                   <th>Projekt</th>
                   <th>Stunden</th>
                   <th>Pause</th>
@@ -160,7 +161,7 @@ export default function MonatView({
                           <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginRight: '0.4rem' }}>{WEEKDAYS[wd]}</span>
                           {String(d).padStart(2,'0')}.{String(month).padStart(2,'0')}.
                         </td>
-                        <td colSpan={7} style={{ color: 'var(--color-text-light)', fontSize: '0.8rem' }}>
+                        <td colSpan={8} style={{ color: 'var(--color-text-light)', fontSize: '0.8rem' }}>
                           {!isWeekend && (
                             <button
                               className="btn btn-xs btn-outline"
@@ -191,6 +192,9 @@ export default function MonatView({
                             {String(d).padStart(2,'0')}.{String(month).padStart(2,'0')}.
                           </>
                         )}
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap', fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
+                        {e.start_time ? e.start_time.slice(0, 5) : '—'}–{e.end_time ? e.end_time.slice(0, 5) : '—'}
                       </td>
                       <td style={{ fontWeight: 500 }}>
                         {e.projects?.customers?.name && <span style={{ color: 'var(--color-text-light)', marginRight: '0.3rem' }}>{e.projects.customers.name} /</span>}

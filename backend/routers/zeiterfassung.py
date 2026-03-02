@@ -1,7 +1,7 @@
 """Zeiterfassung router: Buchungen, Status, Genehmigungsworkflow."""
 import logging
 from typing import Optional
-from datetime import date
+from datetime import date, time
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, field_validator
@@ -20,17 +20,11 @@ VALID_STATUSES = ("draft", "submitted", "approved", "rejected")
 class TimeEntryCreate(BaseModel):
     project_id: str
     entry_date: date
-    hours: float
+    start_time: time
+    end_time: time
     break_hours: float = 0.0
     comment: Optional[str] = None
     is_billable: bool = True
-
-    @field_validator("hours")
-    @classmethod
-    def hours_positive(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("Hours must be positive")
-        return round(v, 2)
 
     @field_validator("break_hours")
     @classmethod
@@ -43,7 +37,8 @@ class TimeEntryCreate(BaseModel):
 class TimeEntryUpdate(BaseModel):
     project_id: Optional[str] = None
     entry_date: Optional[date] = None
-    hours: Optional[float] = None
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
     break_hours: Optional[float] = None
     comment: Optional[str] = None
     is_billable: Optional[bool] = None
@@ -67,6 +62,15 @@ class CopyRequest(BaseModel):
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _calc_hours(start_str: str, end_str: str, break_hours: float) -> float:
+    sh, sm = int(start_str[:2]), int(start_str[3:5])
+    eh, em = int(end_str[:2]), int(end_str[3:5])
+    work_mins = (eh * 60 + em) - (sh * 60 + sm) - round(break_hours * 60)
+    if work_mins <= 0:
+        raise ValueError("Arbeitszeit nach Pause muss positiv sein")
+    return round(work_mins / 60, 2)
+
 
 def _can_edit(entry: dict, current_user: dict) -> bool:
     """Only the owner can edit draft entries; admins always can."""
@@ -135,6 +139,12 @@ async def create_entry(
 ):
     data = body.model_dump()
     data["entry_date"] = data["entry_date"].isoformat()
+    data["start_time"] = data["start_time"].strftime("%H:%M:%S")
+    data["end_time"] = data["end_time"].strftime("%H:%M:%S")
+    try:
+        data["hours"] = _calc_hours(data["start_time"], data["end_time"], data.get("break_hours", 0))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     data["user_id"] = current_user["id"]
     data["status"] = "draft"
     resp = supabase.table("time_entries").insert(data).execute()
@@ -158,6 +168,19 @@ async def update_entry(
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     if "entry_date" in data:
         data["entry_date"] = data["entry_date"].isoformat()
+    if "start_time" in data:
+        data["start_time"] = data["start_time"].strftime("%H:%M:%S")
+    if "end_time" in data:
+        data["end_time"] = data["end_time"].strftime("%H:%M:%S")
+    if any(k in data for k in ("start_time", "end_time", "break_hours")):
+        st = data.get("start_time") or entry.get("start_time")
+        et = data.get("end_time") or entry.get("end_time")
+        bh = data.get("break_hours", entry.get("break_hours", 0))
+        if st and et:
+            try:
+                data["hours"] = _calc_hours(st, et, bh)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc))
     data["updated_at"] = "now()"
     resp = supabase.table("time_entries").update(data).eq("id", entry_id).execute()
     return resp.data[0]
@@ -248,6 +271,8 @@ async def copy_entries(
             "entry_date": body.target_date.isoformat(),
             "hours": e["hours"],
             "break_hours": e.get("break_hours", 0),
+            "start_time": e.get("start_time"),
+            "end_time": e.get("end_time"),
             "comment": e.get("comment"),
             "is_billable": e.get("is_billable", True),
             "status": "draft",

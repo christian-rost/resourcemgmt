@@ -117,6 +117,11 @@ export default function WocheView({ entries, projects, year, month, day, onCreat
                           <span style={{ flex: 1, fontWeight: 500, color: 'var(--color-dark)' }}>
                             {e.projects?.name || '—'}
                           </span>
+                          {(e.start_time || e.end_time) && (
+                            <span style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
+                              {e.start_time ? e.start_time.slice(0, 5) : '—'}–{e.end_time ? e.end_time.slice(0, 5) : '—'}
+                            </span>
+                          )}
                           <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{e.hours}h</span>
                           <span className={`badge badge-${e.status}`} style={{ fontSize: '0.7rem' }}>
                             {STATUS_LABELS[e.status]}

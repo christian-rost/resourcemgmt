@@ -3,18 +3,34 @@ import { useState } from 'react'
 export default function EntryForm({ projects, initialDate, initialEntry, onSave, onCancel }) {
   const [projectId, setProjectId] = useState(initialEntry?.project_id || '')
   const [entryDate, setEntryDate] = useState(initialEntry?.entry_date || initialDate || '')
-  const [hours, setHours] = useState(initialEntry?.hours || '')
+  const [startTime, setStartTime] = useState(initialEntry?.start_time?.slice(0, 5) || '')
+  const [endTime, setEndTime] = useState(initialEntry?.end_time?.slice(0, 5) || '')
   const [breakHours, setBreakHours] = useState(initialEntry?.break_hours || 0)
   const [comment, setComment] = useState(initialEntry?.comment || '')
   const [isBillable, setIsBillable] = useState(initialEntry?.is_billable ?? true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  function calcHours() {
+    if (!startTime || !endTime) return null
+    const [sh, sm] = startTime.split(':').map(Number)
+    const [eh, em] = endTime.split(':').map(Number)
+    const workMins = (eh * 60 + em) - (sh * 60 + sm) - Math.round((parseFloat(breakHours) || 0) * 60)
+    if (workMins <= 0) return null
+    return Math.round(workMins / 60 * 100) / 100
+  }
+
+  const computed = calcHours()
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (!projectId || !entryDate || !hours) {
+    if (!projectId || !entryDate || !startTime || !endTime) {
       setError('Bitte alle Pflichtfelder ausfüllen.')
+      return
+    }
+    if (computed === null) {
+      setError('Arbeitszeit nach Pause muss positiv sein.')
       return
     }
     setSaving(true)
@@ -22,7 +38,8 @@ export default function EntryForm({ projects, initialDate, initialEntry, onSave,
       await onSave({
         project_id: projectId,
         entry_date: entryDate,
-        hours: parseFloat(hours),
+        start_time: startTime,
+        end_time: endTime,
         break_hours: parseFloat(breakHours) || 0,
         comment: comment || null,
         is_billable: isBillable,
@@ -60,14 +77,20 @@ export default function EntryForm({ projects, initialDate, initialEntry, onSave,
       </div>
       <div className="form-row">
         <div className="form-group">
-          <label>Stunden *</label>
+          <label>Arbeitsbeginn *</label>
           <input
-            type="number"
-            step="0.25"
-            min="0.25"
-            max="24"
-            value={hours}
-            onChange={e => setHours(e.target.value)}
+            type="time"
+            value={startTime}
+            onChange={e => setStartTime(e.target.value)}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label>Arbeitsende *</label>
+          <input
+            type="time"
+            value={endTime}
+            onChange={e => setEndTime(e.target.value)}
             required
           />
         </div>
@@ -81,6 +104,12 @@ export default function EntryForm({ projects, initialDate, initialEntry, onSave,
             value={breakHours}
             onChange={e => setBreakHours(e.target.value)}
           />
+        </div>
+        <div className="form-group">
+          <label style={{ visibility: 'hidden' }}>.</label>
+          <div style={{ padding: '0.5rem 0', fontWeight: 600, color: computed !== null ? 'var(--color-primary)' : 'var(--color-text-light)' }}>
+            = {computed !== null ? `${computed.toFixed(2)} h` : '—'}
+          </div>
         </div>
       </div>
       <div className="form-group">

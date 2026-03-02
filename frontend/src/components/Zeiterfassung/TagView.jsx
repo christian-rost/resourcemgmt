@@ -59,6 +59,7 @@ export default function TagView({ entries, projects, year, month, day, onCreateE
               <thead>
                 <tr>
                   <th>Projekt</th>
+                  <th>Zeitraum</th>
                   <th style={{ textAlign: 'right' }}>Stunden</th>
                   <th style={{ textAlign: 'right' }}>Pause</th>
                   <th>Abrechenbar</th>
@@ -73,6 +74,9 @@ export default function TagView({ entries, projects, year, month, day, onCreateE
                     <td style={{ fontWeight: 500 }}>
                       {e.projects?.customers?.name && <span style={{ color: 'var(--color-text-light)', marginRight: '0.3rem' }}>{e.projects.customers.name} /</span>}
                       {e.projects?.name || '—'}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
+                      {e.start_time ? e.start_time.slice(0, 5) : '—'}–{e.end_time ? e.end_time.slice(0, 5) : '—'}
                     </td>
                     <td className="num">{e.hours} h</td>
                     <td className="num">{e.break_hours ? `${e.break_hours} h` : '—'}</td>
@@ -92,6 +96,7 @@ export default function TagView({ entries, projects, year, month, day, onCreateE
               <tfoot>
                 <tr style={{ background: 'var(--color-light-gray)', fontWeight: 600 }}>
                   <td>Gesamt</td>
+                  <td></td>
                   <td className="num">{totalHours.toFixed(1)} h</td>
                   <td colSpan={5}></td>
                 </tr>
