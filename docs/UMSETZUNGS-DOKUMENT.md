@@ -123,7 +123,7 @@ submitted → rejected: Nur Admin/Manager (rejection_reason erforderlich)
 - `frontend/src/components/Admin/AdminView.jsx`
 
 **Konfigurationsschlüssel in `app_config`:**
-- `hours_per_day`, `company_name`, `logo_url`, `primary_color`, `dark_color`
+- `hours_per_day`, `daily_work_hours`, `company_name`, `logo_url`, `primary_color`, `dark_color`
 
 ### Phase 6 – Reports
 
@@ -132,10 +132,30 @@ submitted → rejected: Nur Admin/Manager (rejection_reason erforderlich)
 **Artefakte:**
 - `backend/routers/reports.py` — GET `/api/reports/pdf`
 - `backend/services/pdf_service.py` — ReportLab PDF-Generierung
+- `backend/services/excel_service.py` — openpyxl Excel-Export (XQT5-Vorlage)
 - `frontend/src/components/Reports/ReportsView.jsx`
 
 **PDF-Inhalt:** Firmenname (aus app_config), Projektname/Kundename, Monat, Tabelle (Datum, Stunden, Pause, Kommentar), Gesamtsumme.
 **Filter:** Nur `approved` Einträge, optional `billable_only=true`.
+
+### Phase 7 – Monetäre Erfassung
+
+**Ziel:** Tagessätze, EUR-Budgets und monetäres Dashboard
+
+**Artefakte:**
+- `supabase_migration_monetaer.sql` — DB-Migration (einmalig in Supabase ausführen)
+- `backend/routers/stammdaten.py` — Neue Endpunkte für `project-roles` und `projects/{id}/role-rates`
+- `backend/routers/zeitplanung.py` — Neue Endpunkte `budget-validation-eur` und `budget-dashboard`
+- `backend/routers/zeiterfassung.py` — Feld `project_role_rate_id` in Buchungen
+- `backend/routers/reports.py` — Join auf `project_role_rates` für PDF/Excel
+- `backend/services/pdf_service.py` — Monetäre Spalten + EUR-Footer (rückwärtskompatibel)
+- `frontend/src/components/Stammdaten/StammdatenView.jsx` — Tabs Projektrollen + Rollen & Tagessätze
+- `frontend/src/components/Zeiterfassung/EntryForm.jsx` — Rollenauswahl + Autofill via localStorage
+- `frontend/src/components/Budget/BudgetDashboard.jsx` — KPI-Karten, SVG-Liniendiagramm, Tabelle
+
+**Autofill:** Letzte gewählte Rolle je Projekt wird in `localStorage` unter `lastRole_${projectId}` gespeichert.
+**Forecast:** Linearer Forecast = (Ist-EUR bis heute / vergangene Tage) × Gesamttage im Jahr.
+**Rückwärtskompatibilität:** Buchungen ohne `project_role_rate_id` verhalten sich wie zuvor.
 
 ---
 
@@ -143,19 +163,36 @@ submitted → rejected: Nur Admin/Manager (rejection_reason erforderlich)
 
 Vollständiges Schema: `supabase/schema.sql`
 
-**Tabellen:**
+**Tabellen (Grundschema `supabase/schema.sql`):**
 
 ```sql
 users              (id uuid PK, username, email, display_name, role, password_hash, is_active)
 customers          (id uuid PK, name, short_code, is_active)
 projects           (id uuid PK, customer_id FK, name, short_code, budget_hours, is_active)
 project_assignments(id uuid PK, project_id FK, user_id FK, UNIQUE(project_id, user_id))
-time_entries       (id uuid PK, user_id FK, project_id FK, entry_date, hours, break_hours,
-                    comment, is_billable, status, approved_by FK, approved_at, rejection_reason)
+time_entries       (id uuid PK, user_id FK, project_id FK, entry_date, start_time, end_time,
+                    hours, break_hours, comment, is_billable, status,
+                    approved_by FK, approved_at, rejection_reason)
 planning_entries   (id uuid PK, user_id FK, project_id FK, plan_year, plan_month, plan_day,
                     hours)
 app_config         (key text PK, value text)
 ```
+
+**Monetäre Erweiterung (`supabase_migration_monetaer.sql`):**
+
+```sql
+project_roles      (id uuid PK, name text UNIQUE, description text, is_active bool)
+project_role_rates (id uuid PK, project_id FK, role_id FK nullable, custom_role_name text,
+                    daily_rate_eur numeric(10,2), travel_cost_flat_eur numeric(10,2), is_active bool)
+-- Constraint: role_id IS NOT NULL OR custom_role_name != ''
+
+ALTER TABLE projects      ADD COLUMN budget_eur numeric(12,2);
+ALTER TABLE time_entries  ADD COLUMN project_role_rate_id uuid FK → project_role_rates;
+ALTER TABLE planning_entries ADD COLUMN project_role_rate_id uuid FK → project_role_rates;
+INSERT INTO app_config VALUES ('daily_work_hours', '8');
+```
+
+`hourly_rate_eur` wird nicht gespeichert — Berechnung: `daily_rate_eur / daily_work_hours`.
 
 **Indexes:**
 - `users`: username, email
@@ -164,10 +201,11 @@ app_config         (key text PK, value text)
 
 **Standardkonfiguration (automatisch eingefügt):**
 ```sql
-hours_per_day = '8'
-company_name  = 'Unternehmensberatung'
-primary_color = '#ee7f00'
-dark_color    = '#213452'
+hours_per_day    = '8'
+daily_work_hours = '8'
+company_name     = 'Unternehmensberatung'
+primary_color    = '#ee7f00'
+dark_color       = '#213452'
 ```
 
 ---
@@ -205,9 +243,10 @@ VITE_API_URL = https://rm-api.xqtfive.de
 
 ### Deployment-Reihenfolge
 
-1. Supabase: `schema.sql` ausführen
-2. Backend deployen (wartet auf Supabase)
-3. Frontend deployen (wartet auf Backend-URL)
+1. Supabase: `schema.sql` ausführen (Ersteinrichtung)
+2. Supabase: `supabase_migration_monetaer.sql` ausführen (monetäre Erweiterung, einmalig)
+3. Backend deployen (wartet auf Supabase)
+4. Frontend deployen (wartet auf Backend-URL)
 
 ---
 
@@ -257,6 +296,7 @@ cmd = "npx serve dist -s -p 3000 -L"
 | passlib + bcrypt | 1.7.4 / 4.0.1 | Passwort-Hashing |
 | slowapi | 0.1.9 | Rate-Limiting |
 | reportlab | 4.4.10 | PDF-Generierung |
+| openpyxl | 3.1.x | Excel-Export |
 | pydantic | 2.12.5 | Validierung |
 | python-dotenv | 1.2.1 | Env-Var-Laden |
 

@@ -86,11 +86,24 @@ Für Produktion: `https://rm.xqtfive.de`
 |---------|--------|
 | `users` | Benutzerkonten mit Rollen und Passwort-Hash |
 | `customers` | Kundenstammdaten |
-| `projects` | Projekte mit Budget-Stunden |
+| `projects` | Projekte mit Budget-Stunden und Budget-EUR |
 | `project_assignments` | Zuordnung Berater ↔ Projekt |
-| `time_entries` | Zeitbuchungen mit Status-Workflow |
-| `planning_entries` | Ressourcenplanung (monatlich/täglich) |
+| `project_roles` | Globale Projekt-Mitarbeiter-Rollen (Stammdaten) |
+| `project_role_rates` | Tagessätze und Reisekostenpauschalen je Projekt-Rolle |
+| `time_entries` | Zeitbuchungen mit Status-Workflow und optionaler Rollenzuweisung |
+| `planning_entries` | Ressourcenplanung (monatlich/täglich) mit optionaler Rollenzuweisung |
 | `app_config` | Systemkonfiguration (Schlüssel-Wert) |
+
+### Datenbank-Migrationen
+
+Das initiale Schema befindet sich in `supabase/schema.sql`. Spätere Erweiterungen werden als separate Migrationsskripte bereitgestellt:
+
+| Datei | Inhalt |
+|-------|--------|
+| `supabase/schema.sql` | Grundschema (Ersteinrichtung) |
+| `supabase_migration_monetaer.sql` | Monetäre Erweiterung: `project_roles`, `project_role_rates`, `budget_eur`, `project_role_rate_id`, `daily_work_hours` |
+
+Migrationen in Supabase SQL Editor ausführen (einmalig, in Reihenfolge).
 
 ### Supabase-Key
 
@@ -132,7 +145,8 @@ Der Bootstrap-Admin hat die Rolle `admin` und die E-Mail `<admin_user>@local`.
 
 | Schlüssel | Beschreibung | Standard |
 |-----------|--------------|----------|
-| `hours_per_day` | Arbeitsstunden pro Tag | `8` |
+| `hours_per_day` | Arbeitsstunden pro Tag (für Personentage-Berechnung) | `8` |
+| `daily_work_hours` | Arbeitsstunden pro Tag (für Stundensatz-Berechnung: Tagessatz ÷ daily_work_hours) | `8` |
 | `company_name` | Anzeigename des Unternehmens | `Unternehmensberatung` |
 | `logo_url` | URL zum Firmenlogo | (leer) |
 | `primary_color` | Primärfarbe (Hex) | `#ee7f00` |
@@ -145,8 +159,10 @@ Der Bootstrap-Admin hat die Rolle `admin` und die E-Mail `<admin_user>@local`.
 Kunden und Projekte werden unter **Stammdaten** verwaltet. Nur Admins und Manager haben Schreibzugriff.
 
 **Kunden anlegen:** Name + optionaler Kürzel
-**Projekte anlegen:** Kunde, Name, Kürzel, Budget-Stunden
+**Projekte anlegen:** Kunde, Name, Kürzel, Budget-Stunden, Budget-EUR (optional)
 **Berater zuordnen:** Projekt auswählen → Berater hinzufügen
+**Projektrollen:** Globale Rollenbezeichnungen anlegen (z. B. Senior Consultant, Manager)
+**Tagessätze hinterlegen:** Je Projekt Rolle + Tagessatz + Reisekostenpauschale zuordnen
 
 Consultants sehen in der Zeiterfassung nur Projekte, denen sie zugeordnet sind.
 

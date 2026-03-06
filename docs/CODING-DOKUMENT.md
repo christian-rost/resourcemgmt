@@ -12,13 +12,14 @@ ressourcenmanagement/
 │   ├── main.py            # FastAPI App, CORS, Bootstrap, Router-Registration
 │   ├── user_storage.py    # User-CRUD gegen Supabase
 │   ├── routers/
-│   │   ├── stammdaten.py  # /api/stammdaten/*
+│   │   ├── stammdaten.py  # /api/stammdaten/* (Kunden, Projekte, Rollen, Rollenraten)
 │   │   ├── zeiterfassung.py # /api/zeiterfassung/*
-│   │   ├── zeitplanung.py # /api/zeitplanung/*
+│   │   ├── zeitplanung.py # /api/zeitplanung/* (inkl. budget-dashboard, budget-validation-eur)
 │   │   ├── admin.py       # /api/admin/*
 │   │   └── reports.py     # /api/reports/*
 │   └── services/
-│       └── pdf_service.py # ReportLab PDF-Generierung
+│       ├── pdf_service.py # ReportLab PDF-Generierung (inkl. monetäre Felder)
+│       └── excel_service.py # openpyxl Excel-Export (XQT5-Vorlage)
 ├── frontend/
 │   ├── nixpacks.toml
 │   ├── vite.config.js     # Dev-Proxy: /api → localhost:8003
@@ -32,13 +33,22 @@ ressourcenmanagement/
 │   │   └── components/
 │   │       ├── Login.jsx
 │   │       ├── Dashboard.jsx
+│   │       ├── Budget/
+│   │       │   └── BudgetDashboard.jsx  # Plan/Ist/Trend/Forecast (Manager/Admin)
 │   │       ├── Zeiterfassung/
+│   │       │   ├── ZeiterfassungView.jsx
+│   │       │   ├── EntryForm.jsx        # Rollenauswahl, Autofill
+│   │       │   ├── TagView.jsx
+│   │       │   ├── WocheView.jsx
+│   │       │   └── MonatView.jsx
 │   │       ├── Zeitplanung/
 │   │       ├── Stammdaten/
+│   │       │   └── StammdatenView.jsx   # +Tabs Projektrollen, Rollen & Tagessätze
 │   │       ├── Admin/
 │   │       └── Reports/
 ├── supabase/
 │   └── schema.sql
+├── supabase_migration_monetaer.sql  # Migration: monetäre Erweiterung
 ├── docs/
 ├── nixpacks.toml          # Backend-Deployment (Projekt-Root)
 ├── pyproject.toml
@@ -149,6 +159,14 @@ Das `user_storage.py` Modul kapselt alle User-Operationen und verwendet intern `
 | GET | `/assignments` | Berater-Zuordnungen |
 | POST | `/assignments` | Zuordnung erstellen |
 | DELETE | `/assignments/{id}` | Zuordnung entfernen |
+| GET | `/project-roles` | Globale Projektrollen (admin/manager) |
+| POST | `/project-roles` | Projektrolle erstellen (admin/manager) |
+| PUT | `/project-roles/{id}` | Projektrolle aktualisieren (admin/manager) |
+| DELETE | `/project-roles/{id}` | Projektrolle löschen (admin/manager) |
+| GET | `/projects/{id}/role-rates` | Tagessätze eines Projekts |
+| POST | `/projects/{id}/role-rates` | Tagessatz hinzufügen (admin/manager) |
+| PUT | `/projects/{id}/role-rates/{rate_id}` | Tagessatz aktualisieren (admin/manager) |
+| DELETE | `/projects/{id}/role-rates/{rate_id}` | Tagessatz entfernen (admin/manager) |
 
 ### Zeiterfassung (`/api/zeiterfassung/`)
 | Method | Endpoint | Beschreibung |
@@ -171,7 +189,9 @@ Das `user_storage.py` Modul kapselt alle User-Operationen und verwendet intern `
 | DELETE | `/entries/{id}` | Planung löschen |
 | POST | `/entries/copy` | Monat kopieren |
 | GET | `/dashboard` | Planungs-Dashboard |
-| GET | `/budget-validation` | Budget-Überschreitungen |
+| GET | `/budget-validation` | Budget-Überschreitungen (Stunden) |
+| GET | `/budget-validation-eur` | Budget-Überschreitungen (EUR, admin/manager) |
+| GET | `/budget-dashboard` | KPI + Verlauf + Forecast (?project_id=&year=, admin/manager) |
 | GET | `/soll-ist` | Soll-Ist-Vergleich |
 
 ### Admin (`/api/admin/`)
@@ -197,11 +217,16 @@ Das `user_storage.py` Modul kapselt alle User-Operationen und verwendet intern `
 
 ```
 customers (1) ──── (n) projects (1) ──── (n) project_assignments (n) ──── (1) users
-                                  (1) ──── (n) time_entries       (n) ──── (1) users
-                                  (1) ──── (n) planning_entries   (n) ──── (1) users
+                        │         (1) ──── (n) time_entries       (n) ──── (1) users
+                        │         (1) ──── (n) planning_entries   (n) ──── (1) users
+                        │         (1) ──── (n) project_role_rates (n) ──── (1) project_roles [optional]
+                                           (1) ──── (n) time_entries.project_role_rate_id
+                                           (1) ──── (n) planning_entries.project_role_rate_id
 ```
 
 Alle `user_id`-Felder sind UUIDs und referenzieren `users(id)`.
+
+`project_role_rates.role_id` ist nullable — bei `NULL` wird `custom_role_name` verwendet (REQ-M02).
 
 ### Status-Übergänge (time_entries)
 

@@ -27,7 +27,7 @@ Drei Rollen mit abgestuften Berechtigungen:
 - Consultants haben Lesezugriff
 
 ### REQ-04 – Stammdaten: Projekte
-- CRUD für Projekte (Kunde, Name, Kürzel, Budget-Stunden, Aktiv-Status)
+- CRUD für Projekte (Kunde, Name, Kürzel, Budget-Stunden, Budget-EUR, Aktiv-Status)
 - Verknüpfung mit Kunden (FK mit CASCADE)
 
 ### REQ-05 – Berater-Projekt-Zuordnung
@@ -36,8 +36,9 @@ Drei Rollen mit abgestuften Berechtigungen:
 - Admins/Manager sehen alle aktiven Projekte
 
 ### REQ-06 – Zeiterfassung: Buchung erstellen
-- Felder: Datum, Projekt, Stunden, Pausenzeit, Kommentar, Abrechenbar
-- Validierung: Stunden > 0, Pause ≥ 0
+- Felder: Datum, Projekt, Arbeitsbeginn, Arbeitsende, Pause (h), Kommentar, Abrechenbar, Rolle/Tagessatz (optional)
+- Stunden werden automatisch aus Start-/Endzeit berechnet
+- Validierung: Arbeitszeit nach Pause > 0, Pause ≥ 0
 - Neue Buchungen starten im Status `draft`
 
 ### REQ-07 – Zeiterfassung: Monatsübersicht
@@ -104,11 +105,60 @@ Drei Rollen mit abgestuften Berechtigungen:
 
 ### REQ-19 – Systemkonfiguration (Admin)
 Konfigurierbare Parameter:
-- `hours_per_day`: Arbeitsstunden pro Tag (Standard: 8)
+- `hours_per_day`: Arbeitsstunden pro Tag für PT-Berechnung (Standard: 8)
+- `daily_work_hours`: Arbeitsstunden pro Tag für Stundensatz-Berechnung (Standard: 8)
 - `company_name`: Firmenname
 - `logo_url`: Logo-URL für PDF
 - `primary_color`: Primärfarbe (#ee7f00)
 - `dark_color`: Dunkelfarbe (#213452)
+
+---
+
+## Monetäre Projektsteuerung (Branch: budget)
+
+### REQ-M01 – Globale Projekt-Mitarbeiter-Rollen
+- CRUD für rollenübergreifende Bezeichnungen (z. B. Senior Consultant, Manager)
+- Aktiv/Inaktiv-Status
+- Zugang: Admin/Manager
+
+### REQ-M02 – Projektspezifische Rollen
+- Individuelle Rollenbezeichnungen nur für ein Projekt (ohne globale Stammdaten-Zuordnung)
+- Via `custom_role_name` in `project_role_rates`
+
+### REQ-M03 – Tagessätze und Reisekostenpauschale je Projekt
+- Tabelle `project_role_rates`: Rolle + Tagessatz + Reisekostenpauschale je Projekt
+- Gleiche Rolle mehrfach mit unterschiedlichen Tagessätzen möglich (kein Unique-Constraint)
+- Stundensatz = Tagessatz ÷ `daily_work_hours` (berechnetes Feld, nicht in DB)
+
+### REQ-M04 – Budget (EUR) je Projekt
+- Neues Feld `budget_eur` in `projects`
+- Für monetäre Budget-Überwachung im Dashboard
+
+### REQ-M05 – Rollenauswahl in der Zeiterfassung
+- Feld `project_role_rate_id` in `time_entries`
+- Dropdown erscheint wenn Raten für das Projekt vorhanden sind
+- Tagessatz, Stundensatz, Reisekostenpauschale sind schreibgeschützt (nur Auswahl)
+- Autofill: letzte verwendete Rolle je Projekt via localStorage
+
+### REQ-M06 – Rollenauswahl in der Zeitplanung
+- Feld `project_role_rate_id` in `planning_entries`
+- Ermöglicht monetäre Hochrechnung der Planung
+
+### REQ-M07 – Monetäre Budget-Validierung
+- Endpoint `GET /api/zeitplanung/budget-validation-eur`
+- Berechnung: Σ (geplante Stunden × Stundensatz + Reisekostenpauschale) vs. `budget_eur`
+- Response: delta_eur, delta_pct, over_budget-Flag
+
+### REQ-M08 – Budget-Dashboard
+- Endpoint `GET /api/zeitplanung/budget-dashboard`
+- KPI: Budget, Plan-EUR, Ist-EUR, Forecast (lineare Extrapolation)
+- Frontend: SVG-Liniendiagramm, monatliche Tabelle, Budget-Kontrolle aller Projekte
+- Nur für Manager/Admin
+
+### REQ-M09 – Monetäre Reports
+- PDF-Export: Spalten Rolle + Tagessatz wenn Rollendaten vorhanden
+- PDF-Footer: Leistungsbetrag, Reisekostenpauschale, Gesamtbetrag
+- Rückwärtskompatibel: Buchungen ohne Rollendaten bleiben unverändert
 
 ---
 
@@ -135,10 +185,10 @@ Konfigurierbare Parameter:
 - Vergleich gegen `hours_per_day` Konfiguration
 - Übertrag zwischen Monaten
 
-### Projektberichte
-- Gesamtauswertung pro Projekt über mehrere Monate
-- Vergleich Budget vs. geplant vs. abgerechnet
-- Trenddarstellung
+### Projektberichte (teilweise implementiert)
+- Gesamtauswertung pro Projekt über mehrere Monate → **Budget-Dashboard implementiert**
+- Vergleich Budget vs. geplant vs. abgerechnet → **EUR-Dimension implementiert**
+- Stunden-Trenddarstellung über mehrere Jahre → offen
 
 ### Berater-Kapazitätsplanung
 - Kapazitätsansicht pro Berater über mehrere Monate
