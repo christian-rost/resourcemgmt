@@ -233,6 +233,7 @@ export default function ZeiterfassungView() {
     onSubmitEntries: submitEntries,
     onCopyEntries: copyEntries,
     loading,
+    fetchWithAuth,
   }
 
   return (

@@ -22,6 +22,7 @@ class PlanEntryCreate(BaseModel):
     plan_month: int
     plan_day: Optional[int] = None  # None = monthly planning
     hours: float
+    project_role_rate_id: Optional[str] = None
 
     @field_validator("hours")
     @classmethod
@@ -41,6 +42,7 @@ class PlanEntryCreate(BaseModel):
 class PlanEntryUpdate(BaseModel):
     hours: Optional[float] = None
     plan_day: Optional[int] = None
+    project_role_rate_id: Optional[str] = None
 
 
 class CopyPlanRequest(BaseModel):
@@ -64,7 +66,9 @@ async def list_plan_entries(
 ):
     role = current_user.get("role")
     query = supabase.table("planning_entries").select(
-        "*, projects(name, short_code, budget_hours, customers(name, short_code))"
+        "*, projects(name, short_code, budget_hours, budget_eur, customers(name, short_code)), "
+        "project_role_rates(id, daily_rate_eur, travel_cost_flat_eur, custom_role_name, "
+        "project_roles(name))"
     ).eq("plan_year", year).eq("plan_month", month)
 
     if role == "consultant":
@@ -77,6 +81,16 @@ async def list_plan_entries(
 
     resp = query.order("user_id").execute()
     return resp.data or []
+
+
+def _get_daily_work_hours(supabase) -> float:
+    resp = supabase.table("app_config").select("value").eq("key", "daily_work_hours").execute()
+    if resp.data:
+        try:
+            return float(resp.data[0]["value"])
+        except (ValueError, KeyError):
+            pass
+    return 8.0
 
 
 @router.post("/entries", status_code=201)
@@ -140,6 +154,7 @@ async def copy_plan_month(
             "plan_month": body.target_month,
             "plan_day": e.get("plan_day"),
             "hours": e["hours"],
+            "project_role_rate_id": e.get("project_role_rate_id"),
         }
         for e in entries
     ]
@@ -225,6 +240,158 @@ async def budget_validation(
         result.append(item)
 
     return sorted(result, key=lambda x: x["delta"], reverse=True)
+
+
+@router.get("/budget-validation-eur")
+async def budget_validation_eur(
+    year: int = Query(...),
+    month: Optional[int] = Query(None),
+    current_user: dict = Depends(require_role("admin", "manager")),
+    supabase=Depends(get_supabase),
+):
+    """
+    Monetäre Budget-Kontrolle: geplante EUR (Stunden × Stundensatz + Reisekosten)
+    vs. Projekt-Budget in EUR. Gibt delta und over_budget zurück.
+    """
+    daily_work_hours = _get_daily_work_hours(supabase)
+
+    query = supabase.table("planning_entries").select(
+        "project_id, hours, project_role_rate_id, "
+        "projects(name, budget_eur, customers(name)), "
+        "project_role_rates(daily_rate_eur, travel_cost_flat_eur)"
+    ).eq("plan_year", year)
+    if month:
+        query = query.eq("plan_month", month)
+
+    resp = query.execute()
+    entries = resp.data or []
+
+    by_project: dict = {}
+    for e in entries:
+        pid = e["project_id"]
+        if pid not in by_project:
+            proj = e.get("projects") or {}
+            cust = proj.get("customers") or {}
+            by_project[pid] = {
+                "project_id": pid,
+                "project_name": proj.get("name", ""),
+                "customer_name": cust.get("name", ""),
+                "budget_eur": proj.get("budget_eur") or 0,
+                "planned_eur": 0,
+            }
+        rate = e.get("project_role_rates") or {}
+        daily_rate = rate.get("daily_rate_eur") or 0
+        travel = rate.get("travel_cost_flat_eur") or 0
+        hourly_rate = daily_rate / daily_work_hours if daily_work_hours else 0
+        by_project[pid]["planned_eur"] += round(e["hours"] * hourly_rate + travel, 2)
+
+    result = []
+    for item in by_project.values():
+        item["planned_eur"] = round(item["planned_eur"], 2)
+        delta = item["planned_eur"] - item["budget_eur"]
+        item["delta_eur"] = round(delta, 2)
+        item["over_budget"] = delta > 0
+        item["delta_pct"] = round(
+            (delta / item["budget_eur"] * 100) if item["budget_eur"] else 0, 1
+        )
+        result.append(item)
+
+    return sorted(result, key=lambda x: x["delta_eur"], reverse=True)
+
+
+@router.get("/budget-dashboard")
+async def budget_dashboard(
+    project_id: str = Query(...),
+    year: int = Query(...),
+    current_user: dict = Depends(require_role("admin", "manager")),
+    supabase=Depends(get_supabase),
+):
+    """
+    Budget-Dashboard: monatliche Plan-EUR vs. Ist-EUR für ein Projekt,
+    inkl. kumuliertem Trend und linearem Forecast.
+    """
+    daily_work_hours = _get_daily_work_hours(supabase)
+
+    # Projektinfo + Budget
+    proj_resp = supabase.table("projects").select(
+        "name, budget_eur, budget_hours, customers(name)"
+    ).eq("id", project_id).execute()
+    project = proj_resp.data[0] if proj_resp.data else {}
+    budget_eur = project.get("budget_eur") or 0
+
+    # Planwerte je Monat
+    plan_resp = supabase.table("planning_entries").select(
+        "plan_month, hours, project_role_rates(daily_rate_eur, travel_cost_flat_eur)"
+    ).eq("project_id", project_id).eq("plan_year", year).execute()
+
+    plan_by_month: dict = {m: 0.0 for m in range(1, 13)}
+    for e in (plan_resp.data or []):
+        rate = e.get("project_role_rates") or {}
+        daily_rate = rate.get("daily_rate_eur") or 0
+        travel = rate.get("travel_cost_flat_eur") or 0
+        hourly_rate = daily_rate / daily_work_hours if daily_work_hours else 0
+        plan_by_month[e["plan_month"]] += e["hours"] * hourly_rate + travel
+
+    # Istwerte je Monat (nur approved)
+    start = date(year, 1, 1).isoformat()
+    end = date(year + 1, 1, 1).isoformat()
+    actual_resp = supabase.table("time_entries").select(
+        "entry_date, hours, project_role_rates(daily_rate_eur, travel_cost_flat_eur)"
+    ).eq("project_id", project_id).eq("status", "approved").gte(
+        "entry_date", start
+    ).lt("entry_date", end).execute()
+
+    actual_by_month: dict = {m: 0.0 for m in range(1, 13)}
+    for e in (actual_resp.data or []):
+        m = int(e["entry_date"][5:7])
+        rate = e.get("project_role_rates") or {}
+        daily_rate = rate.get("daily_rate_eur") or 0
+        travel = rate.get("travel_cost_flat_eur") or 0
+        hourly_rate = daily_rate / daily_work_hours if daily_work_hours else 0
+        actual_by_month[m] += e["hours"] * hourly_rate + travel
+
+    # Monatliche Datenpunkte aufbauen
+    months = []
+    cumulative_plan = 0.0
+    cumulative_actual = 0.0
+    for m in range(1, 13):
+        cumulative_plan += plan_by_month[m]
+        cumulative_actual += actual_by_month[m]
+        months.append({
+            "month": m,
+            "plan_eur": round(plan_by_month[m], 2),
+            "actual_eur": round(actual_by_month[m], 2),
+            "cumulative_plan_eur": round(cumulative_plan, 2),
+            "cumulative_actual_eur": round(cumulative_actual, 2),
+        })
+
+    # Linearer Forecast: Hochrechnung auf Basis bisher erfasster Ist-Monate
+    today = date.today()
+    current_month = today.month if today.year == year else (12 if today.year > year else 0)
+    months_with_actual = [m for m in range(1, current_month + 1) if actual_by_month[m] > 0]
+    if months_with_actual and current_month > 0:
+        avg_monthly_actual = cumulative_actual / len(months_with_actual)
+        projected_annual = avg_monthly_actual * 12
+    else:
+        projected_annual = cumulative_plan
+
+    forecast = {
+        "projected_annual_eur": round(projected_annual, 2),
+        "budget_eur": budget_eur,
+        "projected_delta_eur": round(projected_annual - budget_eur, 2),
+        "projected_over_budget": projected_annual > budget_eur,
+    }
+
+    return {
+        "project": {
+            "id": project_id,
+            "name": project.get("name", ""),
+            "customer_name": (project.get("customers") or {}).get("name", ""),
+            "budget_eur": budget_eur,
+        },
+        "months": months,
+        "forecast": forecast,
+    }
 
 
 @router.get("/soll-ist")

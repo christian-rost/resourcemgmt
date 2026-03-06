@@ -3,7 +3,7 @@ import EntryForm from './EntryForm.jsx'
 
 const STATUS_LABELS = { draft: 'Entwurf', submitted: 'Eingereicht', approved: 'Freigegeben', rejected: 'Abgelehnt' }
 
-export default function TagView({ entries, projects, year, month, day, onCreateEntry, onUpdateEntry, onDeleteEntry, onSubmitEntries, loading }) {
+export default function TagView({ entries, projects, year, month, day, onCreateEntry, onUpdateEntry, onDeleteEntry, onSubmitEntries, loading, fetchWithAuth }) {
   const [showForm, setShowForm] = useState(false)
   const [editEntry, setEditEntry] = useState(null)
 
@@ -36,6 +36,7 @@ export default function TagView({ entries, projects, year, month, day, onCreateE
                 projects={projects}
                 initialDate={iso}
                 initialEntry={editEntry}
+                fetchWithAuth={fetchWithAuth}
                 onSave={async data => {
                   if (editEntry) await onUpdateEntry(editEntry.id, data)
                   else await onCreateEntry(data)

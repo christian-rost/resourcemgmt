@@ -25,6 +25,7 @@ class TimeEntryCreate(BaseModel):
     break_hours: float = 0.0
     comment: Optional[str] = None
     is_billable: bool = True
+    project_role_rate_id: Optional[str] = None
 
     @field_validator("break_hours")
     @classmethod
@@ -42,6 +43,7 @@ class TimeEntryUpdate(BaseModel):
     break_hours: Optional[float] = None
     comment: Optional[str] = None
     is_billable: Optional[bool] = None
+    project_role_rate_id: Optional[str] = None
 
 
 class StatusUpdate(BaseModel):
@@ -103,7 +105,9 @@ async def list_entries(
     effective_user_id = user_id if role in ("admin", "manager") and user_id else current_user["id"]
 
     query = supabase.table("time_entries").select(
-        "*, projects(name, short_code, customers(name, short_code))"
+        "*, projects(name, short_code, customers(name, short_code)), "
+        "project_role_rates(id, daily_rate_eur, travel_cost_flat_eur, custom_role_name, "
+        "project_roles(name))"
     )
 
     if role == "consultant":
@@ -275,6 +279,7 @@ async def copy_entries(
             "end_time": e.get("end_time"),
             "comment": e.get("comment"),
             "is_billable": e.get("is_billable", True),
+            "project_role_rate_id": e.get("project_role_rate_id"),
             "status": "draft",
         })
 

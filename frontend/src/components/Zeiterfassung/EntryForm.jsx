@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-export default function EntryForm({ projects, initialDate, initialEntry, onSave, onCancel }) {
+const EUR = v => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(v ?? 0)
+
+export default function EntryForm({ projects, initialDate, initialEntry, onSave, onCancel, fetchWithAuth }) {
   const [projectId, setProjectId] = useState(initialEntry?.project_id || '')
   const [entryDate, setEntryDate] = useState(initialEntry?.entry_date || initialDate || '')
   const [startTime, setStartTime] = useState(initialEntry?.start_time?.slice(0, 5) || '')
@@ -8,8 +10,30 @@ export default function EntryForm({ projects, initialDate, initialEntry, onSave,
   const [breakHours, setBreakHours] = useState(initialEntry?.break_hours || 0)
   const [comment, setComment] = useState(initialEntry?.comment || '')
   const [isBillable, setIsBillable] = useState(initialEntry?.is_billable ?? true)
+  const [projectRoleRateId, setProjectRoleRateId] = useState(initialEntry?.project_role_rate_id || '')
+  const [roleRates, setRoleRates] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Load role rates when project changes and apply autofill
+  useEffect(() => {
+    if (!projectId || !fetchWithAuth) { setRoleRates([]); return }
+    fetchWithAuth(`/api/stammdaten/projects/${projectId}/role-rates`)
+      .then(r => r.ok ? r.json() : [])
+      .then(rates => {
+        const active = (rates || []).filter(r => r.is_active)
+        setRoleRates(active)
+        // Autofill: use last selected role for this project (unless editing)
+        if (!initialEntry?.project_role_rate_id) {
+          const last = localStorage.getItem(`lastRole_${projectId}`)
+          if (last && active.find(r => r.id === last)) {
+            setProjectRoleRateId(last)
+          } else {
+            setProjectRoleRateId('')
+          }
+        }
+      })
+  }, [projectId])
 
   function calcHours() {
     if (!startTime || !endTime) return null
@@ -21,6 +45,12 @@ export default function EntryForm({ projects, initialDate, initialEntry, onSave,
   }
 
   const computed = calcHours()
+  const selectedRate = roleRates.find(r => r.id === projectRoleRateId) || null
+
+  function getRateLabel(r) {
+    const name = r.project_roles?.name || r.custom_role_name || '?'
+    return `${name} – ${EUR(r.daily_rate_eur)}/Tag`
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -43,7 +73,12 @@ export default function EntryForm({ projects, initialDate, initialEntry, onSave,
         break_hours: parseFloat(breakHours) || 0,
         comment: comment || null,
         is_billable: isBillable,
+        project_role_rate_id: projectRoleRateId || null,
       })
+      // Save last used role for this project
+      if (projectRoleRateId) {
+        localStorage.setItem(`lastRole_${projectId}`, projectRoleRateId)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -56,16 +91,11 @@ export default function EntryForm({ projects, initialDate, initialEntry, onSave,
       <div className="form-row">
         <div className="form-group">
           <label>Datum *</label>
-          <input
-            type="date"
-            value={entryDate}
-            onChange={e => setEntryDate(e.target.value)}
-            required
-          />
+          <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} required />
         </div>
         <div className="form-group" style={{ flex: 2 }}>
           <label>Projekt *</label>
-          <select value={projectId} onChange={e => setProjectId(e.target.value)} required>
+          <select value={projectId} onChange={e => { setProjectId(e.target.value); setProjectRoleRateId('') }} required>
             <option value="">— Projekt wählen —</option>
             {projects.map(p => (
               <option key={p.id} value={p.id}>
@@ -78,32 +108,15 @@ export default function EntryForm({ projects, initialDate, initialEntry, onSave,
       <div className="form-row">
         <div className="form-group">
           <label>Arbeitsbeginn *</label>
-          <input
-            type="time"
-            value={startTime}
-            onChange={e => setStartTime(e.target.value)}
-            required
-          />
+          <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} required />
         </div>
         <div className="form-group">
           <label>Arbeitsende *</label>
-          <input
-            type="time"
-            value={endTime}
-            onChange={e => setEndTime(e.target.value)}
-            required
-          />
+          <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} required />
         </div>
         <div className="form-group">
           <label>Pause (h)</label>
-          <input
-            type="number"
-            step="0.25"
-            min="0"
-            max="8"
-            value={breakHours}
-            onChange={e => setBreakHours(e.target.value)}
-          />
+          <input type="number" step="0.25" min="0" max="8" value={breakHours} onChange={e => setBreakHours(e.target.value)} />
         </div>
         <div className="form-group">
           <label style={{ visibility: 'hidden' }}>.</label>
@@ -112,22 +125,41 @@ export default function EntryForm({ projects, initialDate, initialEntry, onSave,
           </div>
         </div>
       </div>
+
+      {/* Rollenauswahl – nur anzeigen wenn Raten für das Projekt vorhanden */}
+      {projectId && roleRates.length > 0 && (
+        <div className="form-row" style={{ alignItems: 'flex-start' }}>
+          <div className="form-group" style={{ flex: 2 }}>
+            <label>Rolle / Tagessatz</label>
+            <select value={projectRoleRateId} onChange={e => setProjectRoleRateId(e.target.value)}>
+              <option value="">— Keine Rolle —</option>
+              {roleRates.map(r => (
+                <option key={r.id} value={r.id}>{getRateLabel(r)}</option>
+              ))}
+            </select>
+          </div>
+          {selectedRate && (
+            <>
+              <div className="form-group">
+                <label>Stundensatz</label>
+                <input readOnly value={EUR(selectedRate.hourly_rate_eur)} style={{ background: 'var(--color-light)', color: 'var(--color-text-light)', cursor: 'default' }} />
+              </div>
+              <div className="form-group">
+                <label>Reisekostenpauschale</label>
+                <input readOnly value={selectedRate.travel_cost_flat_eur > 0 ? EUR(selectedRate.travel_cost_flat_eur) : '—'} style={{ background: 'var(--color-light)', color: 'var(--color-text-light)', cursor: 'default' }} />
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="form-group">
         <label>Kommentar</label>
-        <textarea
-          value={comment}
-          onChange={e => setComment(e.target.value)}
-          placeholder="Optionaler Kommentar zur Tätigkeit…"
-          rows={2}
-        />
+        <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Optionaler Kommentar zur Tätigkeit…" rows={2} />
       </div>
       <div className="form-group">
         <label className="toggle-wrap">
-          <input
-            type="checkbox"
-            checked={isBillable}
-            onChange={e => setIsBillable(e.target.checked)}
-          />
+          <input type="checkbox" checked={isBillable} onChange={e => setIsBillable(e.target.checked)} />
           Abrechenbar (extern sichtbar im Kundenreport)
         </label>
       </div>
@@ -137,9 +169,7 @@ export default function EntryForm({ projects, initialDate, initialEntry, onSave,
           {saving ? 'Speichern...' : initialEntry ? 'Aktualisieren' : 'Eintrag hinzufügen'}
         </button>
         {onCancel && (
-          <button type="button" className="btn btn-secondary" onClick={onCancel}>
-            Abbrechen
-          </button>
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>Abbrechen</button>
         )}
       </div>
     </form>

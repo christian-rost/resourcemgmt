@@ -47,7 +47,8 @@ async def export_pdf(
 
     # Fetch entries
     query = supabase.table("time_entries").select(
-        "*, projects(name, short_code, budget_hours, customers(name, short_code))"
+        "*, projects(name, short_code, budget_hours, customers(name, short_code)), "
+        "project_role_rates(daily_rate_eur, travel_cost_flat_eur, custom_role_name, project_roles(name))"
     ).eq("user_id", effective_user_id).eq("project_id", project_id).gte(
         "entry_date", start
     ).lt("entry_date", end).eq("status", "approved")
@@ -115,7 +116,8 @@ async def export_pdf_all(
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for user in users:
             query = supabase.table("time_entries").select(
-                "*, projects(name, short_code, budget_hours, customers(name, short_code))"
+                "*, projects(name, short_code, budget_hours, customers(name, short_code)), "
+                "project_role_rates(daily_rate_eur, travel_cost_flat_eur, custom_role_name, project_roles(name))"
             ).eq("user_id", user["id"]).eq("project_id", project_id).gte(
                 "entry_date", start
             ).lt("entry_date", end).eq("status", "approved")
@@ -181,7 +183,8 @@ async def export_excel(
     end = date(year + 1, 1, 1).isoformat() if month == 12 else date(year, month + 1, 1).isoformat()
 
     query = supabase.table("time_entries").select(
-        "*, projects(name, short_code, budget_hours, customers(name, short_code))"
+        "*, projects(name, short_code, budget_hours, customers(name, short_code)), "
+        "project_role_rates(daily_rate_eur, travel_cost_flat_eur, custom_role_name, project_roles(name))"
     ).eq("user_id", effective_user_id).eq("project_id", project_id).gte(
         "entry_date", start
     ).lt("entry_date", end).eq("status", "approved")
@@ -244,7 +247,8 @@ async def export_excel_all(
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for user in users:
             query = supabase.table("time_entries").select(
-                "*, projects(name, short_code, budget_hours, customers(name, short_code))"
+                "*, projects(name, short_code, budget_hours, customers(name, short_code)), "
+                "project_role_rates(daily_rate_eur, travel_cost_flat_eur, custom_role_name, project_roles(name))"
             ).eq("user_id", user["id"]).eq("project_id", project_id).gte(
                 "entry_date", start
             ).lt("entry_date", end).eq("status", "approved")

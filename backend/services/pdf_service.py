@@ -138,36 +138,70 @@ def generate_timesheet_pdf(
         elements.append(Paragraph(f"Berater: {user_display}", meta_style))
     elements.append(Spacer(1, 0.5 * cm))
 
+    # Determine if monetary data is available
+    has_rates = any(e.get("project_role_rates") for e in entries)
+    daily_work_hours = float(config.get("daily_work_hours", hours_per_day))
+
+    def _role_name(e: dict) -> str:
+        rate = e.get("project_role_rates") or {}
+        roles = rate.get("project_roles") or {}
+        return roles.get("name") or rate.get("custom_role_name") or "—"
+
+    def _eur(v: float) -> str:
+        return f"{v:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+
     # Table
-    col_widths = [3 * cm, 3 * cm, 2.5 * cm, 2.5 * cm, 1.5 * cm, 5.5 * cm]
-    header_row = ["Datum", "Wochentag", "Stunden", "Pause (h)", "Abr.", "Kommentar"]
+    if has_rates:
+        col_widths = [2.5 * cm, 2.2 * cm, 2 * cm, 1.8 * cm, 1.2 * cm, 2.8 * cm, 2.5 * cm, 2.5 * cm]
+        header_row = ["Datum", "Wochentag", "Stunden", "Pause (h)", "Abr.", "Kommentar", "Rolle", "Tagessatz"]
+    else:
+        col_widths = [3 * cm, 3 * cm, 2.5 * cm, 2.5 * cm, 1.5 * cm, 5.5 * cm]
+        header_row = ["Datum", "Wochentag", "Stunden", "Pause (h)", "Abr.", "Kommentar"]
 
     rows = [header_row]
     total_hours = 0.0
     total_break = 0.0
+    total_amount = 0.0
+    total_travel = 0.0
 
     for e in entries:
         d = date.fromisoformat(e["entry_date"])
-        rows.append([
+        rate = e.get("project_role_rates") or {}
+        daily_rate = float(rate.get("daily_rate_eur") or 0)
+        hourly_rate = daily_rate / daily_work_hours if daily_work_hours and daily_rate else 0
+        travel = float(rate.get("travel_cost_flat_eur") or 0)
+        amount = round(e["hours"] * hourly_rate, 2)
+        total_amount += amount
+        total_travel += travel
+
+        row = [
             d.strftime("%d.%m.%Y"),
             _german_weekday(d.weekday()),
             f"{e['hours']:.2f}",
             f"{e.get('break_hours', 0):.2f}",
             "✓" if e.get("is_billable") else "–",
             e.get("comment") or "",
-        ])
+        ]
+        if has_rates:
+            row.append(_role_name(e))
+            row.append(_eur(daily_rate) if daily_rate else "—")
+        rows.append(row)
         total_hours += e["hours"]
         total_break += e.get("break_hours", 0)
 
     # Summary row
     total_days = total_hours / hours_per_day if hours_per_day else 0
-    rows.append([
+    summary_row = [
         "Gesamt", "",
         f"{total_hours:.2f} h",
         f"{total_break:.2f} h",
         "",
         f"{total_days:.1f} PT",
-    ])
+    ]
+    if has_rates:
+        summary_row.append("")
+        summary_row.append("")
+    rows.append(summary_row)
 
     table = Table(rows, colWidths=col_widths)
     table.setStyle(TableStyle([
@@ -203,6 +237,13 @@ def generate_timesheet_pdf(
         f"(Basis: {hours_per_day:.0f} h/Tag)",
         meta_style,
     ))
+    if has_rates and total_amount > 0:
+        elements.append(Paragraph(
+            f"Leistungsbetrag: <b>{_eur(total_amount)}</b>"
+            + (f" | Reisekostenpauschale: <b>{_eur(total_travel)}</b>" if total_travel > 0 else "")
+            + f" | Gesamt: <b>{_eur(total_amount + total_travel)}</b>",
+            meta_style,
+        ))
     elements.append(Spacer(1, 1 * cm))
     elements.append(Paragraph("Unterschrift Berater: ___________________________", meta_style))
     elements.append(Spacer(1, 0.5 * cm))

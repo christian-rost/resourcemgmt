@@ -8,6 +8,7 @@ import ZeitplanungView from './components/Zeitplanung/ZeitplanungView.jsx'
 import StammdatenView from './components/Stammdaten/StammdatenView.jsx'
 import ReportsView from './components/Reports/ReportsView.jsx'
 import AdminView from './components/Admin/AdminView.jsx'
+import BudgetDashboard from './components/Budget/BudgetDashboard.jsx'
 
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', consultant: 'Berater' }
 
@@ -85,6 +86,7 @@ function AppContent() {
     { key: 'zeitplanung', label: 'Zeitplanung', always: isManager },
     { key: 'stammdaten', label: 'Stammdaten', always: isManager },
     { key: 'reports', label: 'Reports', always: true },
+    { key: 'budget', label: 'Budget', always: isManager },
     { key: 'admin', label: 'Admin', always: isManager },
   ].filter(n => n.always)
 
@@ -120,6 +122,7 @@ function AppContent() {
         {page === 'zeitplanung' && isManager && <ZeitplanungView />}
         {page === 'stammdaten' && isManager && <StammdatenView />}
         {page === 'reports' && <ReportsView />}
+        {page === 'budget' && isManager && <BudgetDashboard />}
         {page === 'admin' && isManager && <AdminView />}
       </main>
     </div>

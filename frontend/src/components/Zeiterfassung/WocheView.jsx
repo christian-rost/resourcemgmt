@@ -20,7 +20,7 @@ function toIso(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-export default function WocheView({ entries, projects, year, month, day, onCreateEntry, onUpdateEntry, onDeleteEntry, onSubmitEntries, loading, isManager }) {
+export default function WocheView({ entries, projects, year, month, day, onCreateEntry, onUpdateEntry, onDeleteEntry, onSubmitEntries, loading, isManager, fetchWithAuth }) {
   const [showForm, setShowForm] = useState(false)
   const [initDate, setInitDate] = useState('')
 
@@ -57,6 +57,7 @@ export default function WocheView({ entries, projects, year, month, day, onCreat
               <EntryForm
                 projects={projects}
                 initialDate={initDate}
+                fetchWithAuth={fetchWithAuth}
                 onSave={async data => {
                   await onCreateEntry(data)
                   setShowForm(false)
