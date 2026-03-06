@@ -1,76 +1,100 @@
 # Ressourcenmanagement – Quickstart
 
-**Ziel:** In 5 Minuten die erste Zeitbuchung erfassen und einreichen.
-
 **URL:** https://rm.xqtfive.de
 
 ---
 
-## 1. Login
+## Login
 
 1. https://rm.xqtfive.de aufrufen
-2. **Benutzername** und **Passwort** eingeben
-3. **Anmelden** klicken
+2. **Benutzername** und **Passwort** eingeben → **Anmelden**
 
 ---
 
-## 2. Erste Zeitbuchung
+## Quickstart nach Rolle
 
-1. Tab **Zeiterfassung** öffnen (Ansicht **Tag** ist Standard)
+### Berater — erste Zeitbuchung in 3 Schritten
+
+**Schritt 1: Eintrag erfassen**
+
+1. Tab **Zeiterfassung** öffnen
 2. **`+ Eintrag`** klicken
 3. Formular ausfüllen:
-   - **Projekt** auswählen
-   - **Stunden** eingeben (z. B. `8`)
-   - **Pause (h)** eingeben (z. B. `0.5`)
-   - **Kommentar** optional
-   - **Abrechenbar** aktivieren wenn zutreffend
-4. **Eintrag hinzufügen**
+   | Feld | Beschreibung |
+   |------|--------------|
+   | Datum | Arbeitstag |
+   | Projekt | Nur zugeordnete Projekte erscheinen |
+   | Arbeitsbeginn / Arbeitsende | Uhrzeit eingeben — Stunden werden automatisch berechnet |
+   | Pause (h) | z. B. `0.5` für 30 Minuten |
+   | Rolle / Tagessatz | Auswählen wenn vom Manager hinterlegt (optional) |
+   | Kommentar | Tätigkeitsbeschreibung (optional) |
+   | Abrechenbar | Aktivieren wenn Zeit beim Kunden abgerechnet wird |
+4. **Eintrag hinzufügen** → Status: **Entwurf**
 
-Die Buchung erscheint mit Status **Entwurf**.
+**Schritt 2: Eintrag einreichen**
 
----
+- Einzelner Eintrag: **Einreichen**-Button am Eintrag
+- Alle Einträge des Tages: **Alle einreichen** (Header der Tagesansicht)
 
-## 3. Buchung einreichen
+Status wechselt auf **Eingereicht**.
 
-- Einzelner Eintrag: **Einreichen**-Button am Eintrag klicken
-- Alle Einträge des Tages auf einmal: **Alle einreichen**
-
-Status wechselt auf **Eingereicht** — der zuständige Manager oder Admin gibt frei.
-
----
-
-## 4. Status verfolgen
+**Schritt 3: Freigabe abwarten**
 
 | Status | Bedeutung |
 |--------|-----------|
-| Entwurf | Noch nicht eingereicht, editierbar |
-| Eingereicht | Wartet auf Freigabe |
-| Freigegeben | Abgeschlossen |
-| Abgelehnt | Mit Ablehnungsgrund |
+| Entwurf | Editierbar, noch nicht eingereicht |
+| Eingereicht | Wartet auf Freigabe durch Manager/Admin |
+| Freigegeben | Abgeschlossen, erscheint im PDF-Export |
+| Abgelehnt | Mit Ablehnungsgrund, nicht mehr editierbar |
 
 ---
 
-## 5. Buchungen kopieren (Tipp)
+### Manager — Einrichtung Projekt mit Tagessätzen
 
-Wiederkehrende Projekte in der **Monatsansicht** schnell kopieren:
-1. Einträge markieren → **Kopieren**
-2. Zieldatum eingeben
-3. Neue Entwürfe sind sofort angelegt
+**Schritt 1: Globale Rollen anlegen** (einmalig)
+
+1. **Stammdaten** → Tab **Projektrollen** → **`+ Neu`**
+2. Rollenbezeichnung eingeben (z. B. `Senior Consultant`, `Manager`) → **Anlegen**
+
+**Schritt 2: Tagessätze je Projekt hinterlegen**
+
+1. **Stammdaten** → Tab **Rollen & Tagessätze** → Projekt in der Liste wählen
+2. **`+ Hinzufügen`** → Rolle aus Dropdown wählen → Tagessatz und ggf. Reisekostenpauschale eingeben → **Hinzufügen**
+
+Der **Stundensatz** (Tagessatz ÷ 8 Std.) wird automatisch berechnet und angezeigt.
+
+**Schritt 3: Budget hinterlegen**
+
+1. **Stammdaten** → Tab **Projekte** → Projekt bearbeiten (✎)
+2. Feld **Budget (EUR)** ausfüllen → **Aktualisieren**
+
+**Schritt 4: Berater freigeben**
+
+Eingereichte Buchungen erscheinen unter **Zeiterfassung → Ausstehende Genehmigungen**:
+- **`✓ OK`** → freigeben
+- **`✕ Ablehnen`** → mit optionalem Ablehnungsgrund zurückweisen
+
+**Schritt 5: Budget überwachen**
+
+Tab **Budget** → Projekt auswählen → Plan vs. Ist + Forecast auf einen Blick.
 
 ---
 
-## Für Manager: Freigabe
+### Admin — Ersteinrichtung
 
-1. **Zeiterfassung** → Tagesansicht des betreffenden Beraters öffnen
-2. Bei eingereichten Einträgen: **`✓ OK`** klicken → Eintrag ist freigegeben
+1. **Admin → Benutzer → `+ Neu`**: Benutzerkonten für alle Mitarbeiter anlegen (Rollen: Berater / Manager / Administrator)
+2. **Admin → Konfiguration**: Unternehmensname, Logo, Farben, Stunden/Tag einstellen → **Speichern**
+3. **Stammdaten → Kunden → `+ Neu`**: Kunden anlegen
+4. **Stammdaten → Projekte → `+ Neu`**: Projekte anlegen, Kunden zuordnen, Stunden- und EUR-Budget hinterlegen
+5. **Stammdaten → Berater-Zuordnung**: Projekte den Beratern zuordnen
+6. **Stammdaten → Projektrollen**: Globale Rollenbezeichnungen anlegen
+7. **Stammdaten → Rollen & Tagessätze**: Tagessätze je Projekt hinterlegen
 
 ---
 
-## Für Manager: Ressourcenplanung
+## Tipp: Autofill bei wiederkehrenden Buchungen
 
-1. Tab **Zeitplanung** → **`+ Planung`**
-2. Berater, Projekt, Monat und Stunden eingeben → **Anlegen**
-3. Soll-Ist-Vergleich im **Dashboard** einsehen
+Die zuletzt verwendete Rolle wird pro Projekt automatisch vorausgefüllt. Einmal auswählen — bei allen folgenden Buchungen für dasselbe Projekt ist die Rolle bereits eingetragen.
 
 ---
 
@@ -78,7 +102,8 @@ Wiederkehrende Projekte in der **Monatsansicht** schnell kopieren:
 
 | Problem | Lösung |
 |---------|--------|
-| Kein Projekt in der Auswahl | Administrator um Projektzuordnung bitten (Stammdaten → Berater-Zuordnung) |
-| Buchung kann nicht bearbeitet werden | Nur Entwürfe sind editierbar |
-| Passwort vergessen | Administrator kontaktieren (Admin → Benutzer → Bearbeiten) |
-| PDF enthält keine Einträge | Einträge müssen Status **Freigegeben** haben |
+| Kein Projekt in der Auswahl | Manager/Admin: Stammdaten → Berater-Zuordnung |
+| Keine Rollenauswahl beim Erfassen | Manager/Admin: Stammdaten → Rollen & Tagessätze |
+| Buchung nicht editierbar | Nur Entwürfe sind editierbar |
+| PDF enthält keine Einträge | Einträge brauchen Status **Freigegeben** |
+| Passwort vergessen | Admin → Benutzer → Bearbeiten |
