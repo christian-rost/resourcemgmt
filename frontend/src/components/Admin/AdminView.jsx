@@ -29,6 +29,20 @@ export default function AdminView() {
   const [cfgPrimary, setCfgPrimary] = useState('')
   const [cfgDark, setCfgDark] = useState('')
 
+  // SMTP config
+  const [smtpHost, setSmtpHost] = useState('')
+  const [smtpPort, setSmtpPort] = useState('587')
+  const [smtpUser, setSmtpUser] = useState('')
+  const [smtpPassword, setSmtpPassword] = useState('')
+  const [smtpFrom, setSmtpFrom] = useState('')
+  const [smtpTls, setSmtpTls] = useState(true)
+
+  // Notification roles config
+  const [notifRoles, setNotifRoles] = useState('admin,manager')
+  const [reportRoles, setReportRoles] = useState('admin,manager')
+
+  const [testingSmtp, setTestingSmtp] = useState(false)
+
   useEffect(() => { loadAll() }, [])
 
   async function loadAll() {
@@ -47,6 +61,14 @@ export default function AdminView() {
         setCfgLogoUrl(c.logo_url || '')
         setCfgPrimary(c.primary_color || '#ee7f00')
         setCfgDark(c.dark_color || '#213452')
+        setSmtpHost(c.smtp_host || '')
+        setSmtpPort(c.smtp_port || '587')
+        setSmtpUser(c.smtp_user || '')
+        setSmtpPassword(c.smtp_password || '')
+        setSmtpFrom(c.smtp_from || '')
+        setSmtpTls(c.smtp_tls !== 'false')
+        setNotifRoles(c.change_notification_roles || 'admin,manager')
+        setReportRoles(c.change_report_roles || 'admin,manager')
       }
     } finally {
       setLoading(false)
@@ -95,10 +117,30 @@ export default function AdminView() {
         logo_url: cfgLogoUrl,
         primary_color: cfgPrimary,
         dark_color: cfgDark,
+        smtp_host: smtpHost,
+        smtp_port: parseInt(smtpPort) || 587,
+        smtp_user: smtpUser,
+        smtp_password: smtpPassword,
+        smtp_from: smtpFrom,
+        smtp_tls: smtpTls,
+        change_notification_roles: notifRoles,
+        change_report_roles: reportRoles,
       }),
     })
     if (resp.ok) { addToast('Konfiguration gespeichert', 'success') }
     else addToast('Fehler beim Speichern', 'error')
+  }
+
+  async function testSmtp() {
+    setTestingSmtp(true)
+    try {
+      const resp = await fetchWithAuth('/api/admin/config/test-smtp', { method: 'POST' })
+      const data = await resp.json()
+      if (resp.ok) addToast(data.detail || 'Test-E-Mail gesendet', 'success')
+      else addToast(data.detail || 'Fehler beim Senden', 'error')
+    } finally {
+      setTestingSmtp(false)
+    }
   }
 
   return (
@@ -221,6 +263,64 @@ export default function AdminView() {
                   </div>
                 </div>
               </div>
+              <hr style={{ margin: '1.5rem 0', borderColor: 'var(--color-gray, #e0e0e0)' }} />
+              <h3 style={{ marginBottom: '1rem', color: 'var(--color-dark)', fontSize: '1rem' }}>E-Mail / SMTP</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>SMTP-Host</label>
+                  <input value={smtpHost} onChange={e => setSmtpHost(e.target.value)} placeholder="mail.example.com" />
+                </div>
+                <div className="form-group" style={{ maxWidth: '120px' }}>
+                  <label>Port</label>
+                  <input type="number" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} min="1" max="65535" />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>SMTP-Benutzer</label>
+                  <input value={smtpUser} onChange={e => setSmtpUser(e.target.value)} placeholder="user@example.com" autoComplete="off" />
+                </div>
+                <div className="form-group">
+                  <label>SMTP-Passwort</label>
+                  <input type="password" value={smtpPassword} onChange={e => setSmtpPassword(e.target.value)} autoComplete="new-password" />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Absender-E-Mail (From)</label>
+                  <input type="email" value={smtpFrom} onChange={e => setSmtpFrom(e.target.value)} placeholder="noreply@example.com" />
+                </div>
+                <div className="form-group" style={{ justifyContent: 'flex-end' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={smtpTls} onChange={e => setSmtpTls(e.target.checked)} />
+                    STARTTLS verwenden
+                  </label>
+                </div>
+              </div>
+              <div>
+                <button type="button" className="btn btn-secondary" onClick={testSmtp} disabled={testingSmtp}>
+                  {testingSmtp ? 'Wird gesendet...' : 'Test-E-Mail senden'}
+                </button>
+                <span style={{ marginLeft: '0.75rem', fontSize: '0.8rem', color: '#888' }}>
+                  Sendet eine Test-E-Mail an Ihre eigene E-Mail-Adresse.
+                </span>
+              </div>
+
+              <hr style={{ margin: '1.5rem 0', borderColor: 'var(--color-gray, #e0e0e0)' }} />
+              <h3 style={{ marginBottom: '1rem', color: 'var(--color-dark)', fontSize: '1rem' }}>Planungsänderungen</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Benachrichtigungs-Rollen (In-App + E-Mail)</label>
+                  <input value={notifRoles} onChange={e => setNotifRoles(e.target.value)} placeholder="admin,manager" />
+                  <div className="form-hint">Kommagetrennte Rollen (z.B. admin,manager)</div>
+                </div>
+                <div className="form-group">
+                  <label>Report-Download-Rollen (Excel)</label>
+                  <input value={reportRoles} onChange={e => setReportRoles(e.target.value)} placeholder="admin,manager" />
+                  <div className="form-hint">Kommagetrennte Rollen (z.B. admin,manager)</div>
+                </div>
+              </div>
+
               <div className="form-actions">
                 <button type="submit" className="btn btn-primary">Konfiguration speichern</button>
               </div>

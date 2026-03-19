@@ -130,13 +130,14 @@ async def health_check():
 
 # ── Register routers ─────────────────────────────────────────────────────────
 
-from .routers import stammdaten, zeiterfassung, zeitplanung, admin, reports
+from .routers import stammdaten, zeiterfassung, zeitplanung, admin, reports, planning_changes
 
 app.include_router(stammdaten.router)
 app.include_router(zeiterfassung.router)
 app.include_router(zeitplanung.router)
 app.include_router(admin.router)
 app.include_router(reports.router)
+app.include_router(planning_changes.router)
 
 
 if __name__ == "__main__":

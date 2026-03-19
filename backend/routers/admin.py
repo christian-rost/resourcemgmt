@@ -69,6 +69,14 @@ class AppConfigUpdate(BaseModel):
     logo_url: Optional[str] = None
     primary_color: Optional[str] = None
     dark_color: Optional[str] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from: Optional[str] = None
+    smtp_tls: Optional[bool] = None
+    change_notification_roles: Optional[str] = None
+    change_report_roles: Optional[str] = None
 
 
 # ── User Management ──────────────────────────────────────────────────────────
@@ -158,6 +166,14 @@ async def update_config(
         "logo_url": body.logo_url,
         "primary_color": body.primary_color,
         "dark_color": body.dark_color,
+        "smtp_host": body.smtp_host,
+        "smtp_port": None if body.smtp_port is None else body.smtp_port,
+        "smtp_user": body.smtp_user,
+        "smtp_password": body.smtp_password,
+        "smtp_from": body.smtp_from,
+        "smtp_tls": None if body.smtp_tls is None else body.smtp_tls,
+        "change_notification_roles": body.change_notification_roles,
+        "change_report_roles": body.change_report_roles,
     }
     for key, val in mapping.items():
         if val is not None:
@@ -168,3 +184,37 @@ async def update_config(
 
     resp = supabase.table("app_config").select("*").execute()
     return {row["key"]: row["value"] for row in (resp.data or [])}
+
+
+@router.post("/config/test-smtp")
+async def test_smtp(
+    current_user: dict = Depends(require_role("admin")),
+    supabase=Depends(get_supabase),
+):
+    """Sendet eine Test-E-Mail an den aktuellen Admin-User."""
+    to_email = current_user.get("email")
+    if not to_email:
+        raise HTTPException(status_code=400, detail="Kein E-Mail-Adresse für diesen User hinterlegt")
+
+    cfg_resp = supabase.table("app_config").select("key, value").execute()
+    config = {row["key"]: row["value"] for row in (cfg_resp.data or [])}
+
+    from ..services.email_service import send_email
+    ok = send_email(
+        smtp_config=config,
+        to=[to_email],
+        subject="XQT5 Ressource – SMTP Test",
+        body_html="""
+        <html><body style="font-family:sans-serif;color:#213452">
+        <h2 style="color:#ee7f00">SMTP-Test erfolgreich</h2>
+        <p>Diese E-Mail bestätigt, dass die SMTP-Konfiguration korrekt ist.</p>
+        <p style="color:#888;font-size:12px">XQT5 Ressource</p>
+        </body></html>
+        """,
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=500,
+            detail="E-Mail konnte nicht gesendet werden. Bitte SMTP-Einstellungen prüfen.",
+        )
+    return {"detail": f"Test-E-Mail an {to_email} gesendet"}

@@ -3,11 +3,12 @@ import logging
 from typing import Optional
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, field_validator
 
 from ..auth import get_current_user, require_role
 from ..database import get_db as get_supabase
+from ..services.email_service import send_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/zeitplanung", tags=["Zeitplanung"])
@@ -83,6 +84,110 @@ async def list_plan_entries(
     return resp.data or []
 
 
+def _load_smtp_config(supabase) -> dict:
+    resp = supabase.table("app_config").select("key, value").execute()
+    return {row["key"]: row["value"] for row in (resp.data or [])}
+
+
+def _log_change(supabase, background_tasks: BackgroundTasks, action: str, changed_by: str,
+                entry: dict, old_data: dict = None, new_data: dict = None):
+    """Schreibt einen Eintrag in planning_change_log und sendet ggf. eine E-Mail."""
+    log_entry = {
+        "planning_entry_id": str(entry.get("id") or ""),
+        "changed_by": changed_by,
+        "action": action,
+        "old_data": old_data,
+        "new_data": new_data,
+        "affected_user_id": entry.get("user_id"),
+        "project_id": str(entry.get("project_id") or ""),
+        "plan_year": entry.get("plan_year"),
+        "plan_month": entry.get("plan_month"),
+    }
+    try:
+        supabase.table("planning_change_log").insert(log_entry).execute()
+    except Exception as e:
+        logger.error(f"Failed to write planning_change_log: {e}")
+        return
+
+    # E-Mail-Benachrichtigung
+    try:
+        config = _load_smtp_config(supabase)
+        smtp_host = config.get("smtp_host", "").strip()
+        if not smtp_host:
+            return
+
+        notif_roles_raw = config.get("change_notification_roles", "admin,manager")
+        notif_roles = [r.strip() for r in notif_roles_raw.split(",") if r.strip()]
+
+        users_resp = supabase.table("users").select(
+            "email, display_name, role"
+        ).eq("is_active", True).execute()
+        recipients = [
+            u["email"] for u in (users_resp.data or [])
+            if u.get("role") in notif_roles and u.get("email")
+        ]
+        if not recipients:
+            return
+
+        # Projekt-Name laden
+        proj_id = entry.get("project_id") or ""
+        proj_name = proj_id
+        try:
+            pr = supabase.table("projects").select("name").eq("id", proj_id).execute()
+            if pr.data:
+                proj_name = pr.data[0].get("name", proj_id)
+        except Exception:
+            pass
+
+        # Betroffener User-Name
+        aff_user_id = entry.get("user_id") or ""
+        aff_name = aff_user_id
+        try:
+            ur = supabase.table("users").select("display_name, username").eq(
+                "id", aff_user_id
+            ).execute()
+            if ur.data:
+                aff_name = ur.data[0].get("display_name") or ur.data[0].get("username") or aff_user_id
+        except Exception:
+            pass
+
+        action_labels = {"create": "erstellt", "update": "geändert", "delete": "gelöscht"}
+        action_de = action_labels.get(action, action)
+
+        old_h = (old_data or {}).get("hours", "–")
+        new_h = (new_data or {}).get("hours", "–")
+        year = entry.get("plan_year")
+        month = entry.get("plan_month")
+        months_de = {1:"Januar",2:"Februar",3:"März",4:"April",5:"Mai",6:"Juni",
+                     7:"Juli",8:"August",9:"September",10:"Oktober",11:"November",12:"Dezember"}
+        zeitraum = f"{months_de.get(month, month)} {year}" if year and month else ""
+
+        subject = f"Planungsänderung {action_de}: {aff_name} / {proj_name}"
+        body_html = f"""
+        <html><body style="font-family:sans-serif;color:#213452">
+        <h2 style="color:#ee7f00">Planungsänderung</h2>
+        <table style="border-collapse:collapse;width:100%;max-width:500px">
+          <tr><td style="padding:6px 12px;font-weight:bold;background:#f5f5f5">Aktion</td>
+              <td style="padding:6px 12px">{action_de.capitalize()}</td></tr>
+          <tr><td style="padding:6px 12px;font-weight:bold;background:#f5f5f5">Berater</td>
+              <td style="padding:6px 12px">{aff_name}</td></tr>
+          <tr><td style="padding:6px 12px;font-weight:bold;background:#f5f5f5">Projekt</td>
+              <td style="padding:6px 12px">{proj_name}</td></tr>
+          <tr><td style="padding:6px 12px;font-weight:bold;background:#f5f5f5">Zeitraum</td>
+              <td style="padding:6px 12px">{zeitraum}</td></tr>
+          <tr><td style="padding:6px 12px;font-weight:bold;background:#f5f5f5">Alt (Std)</td>
+              <td style="padding:6px 12px">{old_h}</td></tr>
+          <tr><td style="padding:6px 12px;font-weight:bold;background:#f5f5f5">Neu (Std)</td>
+              <td style="padding:6px 12px">{new_h}</td></tr>
+        </table>
+        <p style="color:#888;font-size:12px;margin-top:20px">XQT5 Ressource – automatische Benachrichtigung</p>
+        </body></html>
+        """
+        background_tasks.add_task(send_email, config, recipients, subject, body_html)
+    except Exception as e:
+        logger.error(f"Failed to schedule change notification email: {e}")
+
+
 def _get_daily_work_hours(supabase) -> float:
     resp = supabase.table("app_config").select("value").eq("key", "daily_work_hours").execute()
     if resp.data:
@@ -96,35 +201,52 @@ def _get_daily_work_hours(supabase) -> float:
 @router.post("/entries", status_code=201)
 async def create_plan_entry(
     body: PlanEntryCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(require_role("admin", "manager")),
     supabase=Depends(get_supabase),
 ):
     resp = supabase.table("planning_entries").insert(body.model_dump()).execute()
-    return resp.data[0]
+    created = resp.data[0]
+    _log_change(supabase, background_tasks, "create", current_user["id"],
+                created, old_data=None, new_data=created)
+    return created
 
 
 @router.put("/entries/{entry_id}")
 async def update_plan_entry(
     entry_id: str,
     body: PlanEntryUpdate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(require_role("admin", "manager")),
     supabase=Depends(get_supabase),
 ):
+    old_resp = supabase.table("planning_entries").select("*").eq("id", entry_id).execute()
+    old_entry = old_resp.data[0] if old_resp.data else {}
+
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     data["updated_at"] = "now()"
     resp = supabase.table("planning_entries").update(data).eq("id", entry_id).execute()
     if not resp.data:
         raise HTTPException(status_code=404, detail="Planning entry not found")
-    return resp.data[0]
+    updated = resp.data[0]
+    _log_change(supabase, background_tasks, "update", current_user["id"],
+                updated, old_data=old_entry, new_data=updated)
+    return updated
 
 
 @router.delete("/entries/{entry_id}", status_code=204)
 async def delete_plan_entry(
     entry_id: str,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(require_role("admin", "manager")),
     supabase=Depends(get_supabase),
 ):
+    old_resp = supabase.table("planning_entries").select("*").eq("id", entry_id).execute()
+    old_entry = old_resp.data[0] if old_resp.data else {}
     supabase.table("planning_entries").delete().eq("id", entry_id).execute()
+    if old_entry:
+        _log_change(supabase, background_tasks, "delete", current_user["id"],
+                    old_entry, old_data=old_entry, new_data=None)
 
 
 @router.post("/entries/copy", status_code=201)
