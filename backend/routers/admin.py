@@ -25,6 +25,7 @@ class UserCreate(BaseModel):
     password: str
     role: str = "consultant"
     display_name: Optional[str] = None
+    is_planer: bool = False
 
     @field_validator("username")
     @classmethod
@@ -54,6 +55,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
+    is_planer: Optional[bool] = None
 
     @field_validator("role")
     @classmethod
@@ -94,12 +96,16 @@ async def create_new_user(
     # Manager dürfen keine Admins anlegen
     if current_user.get("role") == "manager" and body.role == "admin":
         raise HTTPException(status_code=403, detail="Manager cannot create admin users")
+    # Planer-Rolle nur zusammen mit Manager-Rolle
+    if body.is_planer and body.role != "manager":
+        raise HTTPException(status_code=400, detail="Planer-Rolle kann nur zusammen mit der Manager-Rolle vergeben werden")
     user = create_user(
         username=body.username,
         email=body.email,
         password=body.password,
         role=body.role,
         display_name=body.display_name or body.username,
+        is_planer=body.is_planer,
     )
     if not user:
         raise HTTPException(status_code=409, detail="Username or email already exists")
@@ -121,6 +127,12 @@ async def update_existing_user(
         updates["role"] = body.role
     if body.is_active is not None:
         updates["is_active"] = body.is_active
+    if body.is_planer is not None:
+        # Planer-Rolle nur zusammen mit Manager-Rolle
+        target_role = body.role or (get_user_by_id(user_id) or {}).get("role")
+        if body.is_planer and target_role != "manager":
+            raise HTTPException(status_code=400, detail="Planer-Rolle kann nur zusammen mit der Manager-Rolle vergeben werden")
+        updates["is_planer"] = body.is_planer
     if body.password is not None:
         if len(body.password) < 8:
             raise HTTPException(status_code=400, detail="Password must be at least 8 characters")

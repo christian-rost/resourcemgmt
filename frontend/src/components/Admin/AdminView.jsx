@@ -3,7 +3,7 @@ import { useAuth } from '../../auth.jsx'
 import { useToast } from '../../toast.jsx'
 
 const ROLES = ['admin', 'manager', 'consultant']
-const ROLE_LABELS = { admin: 'Administrator', manager: 'Manager', consultant: 'Berater' }
+const ROLE_LABELS = { admin: 'Administrator', manager: 'Manager', consultant: 'Berater', planer: 'Planer' }
 
 export default function AdminView() {
   const { fetchWithAuth, isAdmin, isManager, user } = useAuth()
@@ -20,6 +20,7 @@ export default function AdminView() {
   const [uEmail, setUEmail] = useState('')
   const [uDisplay, setUDisplay] = useState('')
   const [uRole, setURole] = useState('consultant')
+  const [uIsPlaner, setUIsPlaner] = useState(false)
   const [uPw, setUPw] = useState('')
 
   // Config form
@@ -76,17 +77,17 @@ export default function AdminView() {
   }
 
   function openNew() {
-    setEditUser(null); setUName(''); setUEmail(''); setUDisplay(''); setURole('consultant'); setUPw(''); setShowUserForm(true)
+    setEditUser(null); setUName(''); setUEmail(''); setUDisplay(''); setURole('consultant'); setUIsPlaner(false); setUPw(''); setShowUserForm(true)
   }
   function openEdit(u) {
-    setEditUser(u); setUName(u.username); setUEmail(u.email); setUDisplay(u.display_name || ''); setURole(u.role); setUPw(''); setShowUserForm(true)
+    setEditUser(u); setUName(u.username); setUEmail(u.email); setUDisplay(u.display_name || ''); setURole(u.role); setUIsPlaner(u.is_planer || false); setUPw(''); setShowUserForm(true)
   }
 
   async function saveUser(ev) {
     ev.preventDefault()
     const body = editUser
-      ? { email: uEmail, display_name: uDisplay, role: uRole, ...(uPw ? { password: uPw } : {}) }
-      : { username: uName, email: uEmail, display_name: uDisplay, role: uRole, password: uPw }
+      ? { email: uEmail, display_name: uDisplay, role: uRole, is_planer: uIsPlaner, ...(uPw ? { password: uPw } : {}) }
+      : { username: uName, email: uEmail, display_name: uDisplay, role: uRole, is_planer: uIsPlaner, password: uPw }
     const resp = await fetchWithAuth(
       editUser ? `/api/admin/users/${editUser.id}` : '/api/admin/users',
       { method: editUser ? 'PUT' : 'POST', body: JSON.stringify(body) }
@@ -180,9 +181,15 @@ export default function AdminView() {
                   </div>
                   <div className="form-group">
                     <label>Rolle *</label>
-                    <select value={uRole} onChange={e => setURole(e.target.value)}>
+                    <select value={uRole} onChange={e => { setURole(e.target.value); if (e.target.value !== 'manager') setUIsPlaner(false) }}>
                       {ROLES.filter(r => isAdmin || r !== 'admin').map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                     </select>
+                    {uRole === 'manager' && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                        <input type="checkbox" checked={uIsPlaner} onChange={e => setUIsPlaner(e.target.checked)} />
+                        Zusatzrolle: Planer
+                      </label>
+                    )}
                   </div>
                 </div>
                 <div className="form-group" style={{ maxWidth: '300px' }}>
@@ -208,7 +215,10 @@ export default function AdminView() {
                     <td style={{ fontWeight: 500 }}>{u.display_name || u.username}</td>
                     <td className="mono">{u.username}</td>
                     <td>{u.email}</td>
-                    <td><span className={`badge badge-${u.role === 'admin' ? 'rejected' : u.role === 'manager' ? 'submitted' : 'primary'}`}>{ROLE_LABELS[u.role]}</span></td>
+                    <td>
+                      <span className={`badge badge-${u.role === 'admin' ? 'rejected' : u.role === 'manager' ? 'submitted' : 'primary'}`}>{ROLE_LABELS[u.role]}</span>
+                      {u.is_planer && <span className="badge badge-warning" style={{ marginLeft: '0.3rem' }}>Planer</span>}
+                    </td>
                     <td>{u.is_active !== false ? <span style={{ color: 'var(--color-success)' }}>✓</span> : <span style={{ color: 'var(--color-error)' }}>✕</span>}</td>
                     {isAdmin && (
                       <td>

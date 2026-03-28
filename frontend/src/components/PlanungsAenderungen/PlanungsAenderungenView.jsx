@@ -14,7 +14,7 @@ const currentYear = new Date().getFullYear()
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
 
 export default function PlanungsAenderungenView() {
-  const { fetchWithAuth } = useAuth()
+  const { fetchWithAuth, isPlaner, user } = useAuth()
   const { addToast } = useToast()
 
   const [changes, setChanges] = useState([])
@@ -35,6 +35,7 @@ export default function PlanungsAenderungenView() {
   })
   const [excelTo, setExcelTo] = useState(() => new Date().toISOString().slice(0, 10))
   const [downloading, setDownloading] = useState(false)
+  const [acknowledging, setAcknowledging] = useState(null)
 
   useEffect(() => {
     loadMeta()
@@ -77,6 +78,26 @@ export default function PlanungsAenderungenView() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function acknowledge(changeId) {
+    setAcknowledging(changeId)
+    try {
+      const resp = await fetchWithAuth(`/api/planning-changes/${changeId}/acknowledge`, { method: 'PATCH' })
+      if (resp.ok) {
+        addToast('Als "Übernommen" markiert', 'success')
+        setChanges(prev => prev.map(c =>
+          c.id === changeId
+            ? { ...c, acknowledged_by: user.id, acknowledged_at: new Date().toISOString() }
+            : c
+        ))
+      } else {
+        const err = await resp.json()
+        addToast(err.detail || 'Fehler', 'error')
+      }
+    } finally {
+      setAcknowledging(null)
     }
   }
 
@@ -194,6 +215,7 @@ export default function PlanungsAenderungenView() {
                   <th>Projekt</th>
                   <th>Zeitraum</th>
                   <th>Stunden (Alt → Neu)</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -214,6 +236,26 @@ export default function PlanungsAenderungenView() {
                         : '–'}
                     </td>
                     <td className="mono">{hoursArrow(c)}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {c.acknowledged_at ? (
+                        <span
+                          className="badge badge-approved"
+                          title={`Übernommen von ${userName(c.acknowledged_by)} am ${formatTs(c.acknowledged_at)}`}
+                        >
+                          Übernommen
+                        </span>
+                      ) : isPlaner ? (
+                        <button
+                          className="btn btn-xs btn-secondary"
+                          onClick={() => acknowledge(c.id)}
+                          disabled={acknowledging === c.id}
+                        >
+                          {acknowledging === c.id ? '...' : 'Übernehmen'}
+                        </button>
+                      ) : (
+                        <span style={{ color: '#aaa' }}>–</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

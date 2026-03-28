@@ -65,11 +65,12 @@ export function AuthProvider({ children }) {
   const isAuthenticated = !!user
   const isAdmin = user?.role === 'admin'
   const isManager = user?.role === 'admin' || user?.role === 'manager'
+  const isPlaner = user?.role === 'manager' && user?.is_planer === true
 
   return (
     <AuthContext.Provider value={{
       user, loading, login, logout, fetchWithAuth,
-      isAuthenticated, isAdmin, isManager,
+      isAuthenticated, isAdmin, isManager, isPlaner,
     }}>
       {children}
     </AuthContext.Provider>

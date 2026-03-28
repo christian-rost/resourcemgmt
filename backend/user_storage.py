@@ -45,7 +45,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
 def list_users() -> list[dict]:
     try:
         resp = _db().table("users").select(
-            "id, username, email, display_name, role, is_active, created_at"
+            "id, username, email, display_name, role, is_planer, is_active, created_at"
         ).order("username").execute()
         return resp.data or []
     except Exception as e:
@@ -59,6 +59,7 @@ def create_user(
     password: str,
     role: str = "consultant",
     display_name: str = "",
+    is_planer: bool = False,
 ) -> Optional[dict]:
     from .auth import hash_password
 
@@ -68,6 +69,10 @@ def create_user(
     if get_user_by_username(username) or get_user_by_email(email):
         return None
 
+    # Planer-Rolle nur zusammen mit Manager-Rolle
+    if is_planer and role != "manager":
+        is_planer = False
+
     try:
         data = {
             "username": username,
@@ -76,6 +81,7 @@ def create_user(
             "role": role,
             "password_hash": hash_password(password),
             "is_active": True,
+            "is_planer": is_planer,
         }
         resp = _db().table("users").insert(data).execute()
         user = resp.data[0]

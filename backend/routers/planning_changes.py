@@ -1,5 +1,6 @@
 """Router: Planungsänderungs-Log – Anzeige und Excel-Download."""
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -55,6 +56,39 @@ async def list_changes(
 
     resp = query.execute()
     return resp.data or []
+
+
+@router.patch("/{change_id}/acknowledge")
+async def acknowledge_change(
+    change_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase),
+):
+    """Setzt den Status eines Planungsänderungs-Eintrags auf 'Übernommen'. Nur für Planer."""
+    if not current_user.get("is_planer"):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung – Planer-Rolle erforderlich")
+
+    # Eintrag laden
+    resp = supabase.table("planning_change_log").select(
+        "id, acknowledged_at"
+    ).eq("id", change_id).maybe_single().execute()
+
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+
+    if resp.data.get("acknowledged_at") is not None:
+        raise HTTPException(status_code=409, detail="Eintrag wurde bereits als 'Übernommen' markiert")
+
+    now = datetime.now(timezone.utc).isoformat()
+    update_resp = supabase.table("planning_change_log").update({
+        "acknowledged_by": current_user["id"],
+        "acknowledged_at": now,
+    }).eq("id", change_id).execute()
+
+    if not update_resp.data:
+        raise HTTPException(status_code=500, detail="Fehler beim Aktualisieren")
+
+    return update_resp.data[0]
 
 
 @router.get("/report/excel")
