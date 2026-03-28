@@ -223,7 +223,7 @@ async def update_plan_entry(
     old_resp = supabase.table("planning_entries").select("*").eq("id", entry_id).execute()
     old_entry = old_resp.data[0] if old_resp.data else {}
 
-    data = {k: v for k, v in body.model_dump().items() if v is not None}
+    data = {k: v for k, v in body.model_dump().items() if k in body.model_fields_set}
     data["updated_at"] = "now()"
     resp = supabase.table("planning_entries").update(data).eq("id", entry_id).execute()
     if not resp.data:
