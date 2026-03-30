@@ -81,6 +81,7 @@ class UserResponse(BaseModel):
     display_name: str = ""
     role: str = "consultant"
     is_active: bool = True
+    is_planer: bool = False
 
 
 # ── Auth endpoints ───────────────────────────────────────────────────────────
